@@ -17,24 +17,20 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-      const result = await Promise.race([
-        supabase.auth.signInWithPassword({ email, password }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Login timed out. Please try again.")), 10000)
-        ),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ]) as any;
-
-      if (result?.error) {
-        setError(result.error.message);
+      if (error) {
+        setError(error.message);
         setLoading(false);
-      } else {
-        window.location.href = "/dashboard";
+        return;
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
+
+      // Small delay to let auth state persist
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 500);
+    } catch {
+      setError("Login failed. Please check your connection and try again.");
       setLoading(false);
     }
   };
@@ -55,8 +51,10 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1.5">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium mb-1.5">Email</label>
             <input
+              id="email"
+              name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -67,8 +65,10 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1.5">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium mb-1.5">Password</label>
             <input
+              id="password"
+              name="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
