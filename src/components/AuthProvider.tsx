@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
@@ -36,35 +36,42 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+    if (initialized.current) return;
+    initialized.current = true;
 
-      if (user) {
+    const supabase = createClient();
+
+    // Use getSession for faster initial load
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase.auth.getSession().then(async ({ data: { session } }: any) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      if (currentUser) {
         const { data } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", user.id)
+          .eq("id", currentUser.id)
           .single();
         setProfile(data);
       }
 
       setLoading(false);
-    };
+    });
 
-    getUser();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-
-      if (session?.user) {
+      if (currentUser) {
         const { data } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", session.user.id)
+          .eq("id", currentUser.id)
           .single();
         setProfile(data);
       } else {
@@ -75,9 +82,10 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => subscription.unsubscribe();
-  }, [supabase]);
+  }, []);
 
   const signOut = async () => {
+    const supabase = createClient();
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);

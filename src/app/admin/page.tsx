@@ -48,30 +48,39 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "orders" | "listings">("overview");
 
+  const [fetched, setFetched] = useState(false);
+
   useEffect(() => {
     if (authLoading) return;
     if (!user || user.email !== ADMIN_EMAIL) {
       router.push("/");
       return;
     }
+    if (fetched) return;
 
     const supabase = createClient();
 
     const fetchAll = async () => {
-      const [usersRes, ordersRes, listingsRes] = await Promise.all([
-        supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-        supabase.from("orders").select("*").order("created_at", { ascending: false }),
-        supabase.from("listings").select("*").order("created_at", { ascending: false }),
-      ]);
+      try {
+        const [usersRes, ordersRes, listingsRes] = await Promise.all([
+          supabase.from("profiles").select("*").order("created_at", { ascending: false }),
+          supabase.from("orders").select("*").order("created_at", { ascending: false }),
+          supabase.from("listings").select("*").order("created_at", { ascending: false }),
+        ]);
 
-      setUsers(usersRes.data || []);
-      setOrders(ordersRes.data || []);
-      setListings(listingsRes.data || []);
+        setUsers(usersRes.data || []);
+        setOrders(ordersRes.data || []);
+        setListings(listingsRes.data || []);
+      } catch {
+        // Failed to fetch
+      }
       setLoading(false);
+      setFetched(true);
     };
 
     fetchAll();
-  }, [user, authLoading, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, fetched]);
 
   if (authLoading || loading) {
     return (

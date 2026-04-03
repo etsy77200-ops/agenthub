@@ -88,7 +88,8 @@ export default function DashboardPage() {
     };
 
     fetchData();
-  }, [user, authLoading, router, fetched]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, fetched]);
 
   if (authLoading || loading) {
     return (

@@ -42,7 +42,8 @@ export default function CreateListingPage() {
       setCatsFetched(true);
     };
     fetchCategories();
-  }, [user, authLoading, router, catsFetched]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authLoading, catsFetched]);
 
   const handleSubmit = async (e: React.FormEvent, status: "active" | "draft") => {
     e.preventDefault();
