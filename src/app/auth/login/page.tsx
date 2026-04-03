@@ -33,15 +33,26 @@ export default function LoginPage() {
       return;
     }
 
-    // Set the session in Supabase client — don't await, just redirect
+    // Store tokens manually so the session persists across page load
     const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any) => {
+      if (event === "SIGNED_IN") {
+        subscription.unsubscribe();
+        window.location.replace("/dashboard");
+      }
+    });
+
+    // Set session — this triggers the SIGNED_IN event above
     supabase.auth.setSession({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
     });
 
-    // Redirect immediately
-    window.location.replace("/dashboard");
+    // Fallback redirect after 3 seconds if event doesn't fire
+    setTimeout(() => {
+      window.location.replace("/dashboard");
+    }, 3000);
   };
 
   return (
