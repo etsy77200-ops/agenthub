@@ -54,31 +54,35 @@ export default function DashboardPage() {
     const supabase = createClient();
 
     const fetchData = async () => {
-      const listingsRes = await supabase
-        .from("listings")
-        .select("id, title, price, order_count, status")
-        .eq("seller_id", user.id)
-        .order("created_at", { ascending: false });
-
-      let orderData: DashboardOrder[] = [];
       try {
-        const ordersRes = await supabase
-          .from("orders")
-          .select("id, amount, status, created_at, listing_id, buyer_id")
+        const listingsRes = await supabase
+          .from("listings")
+          .select("id, title, price, order_count, status")
           .eq("seller_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(5);
-        orderData = (ordersRes.data || []).map((o: Record<string, unknown>) => ({
-          ...o,
-          listings: null,
-          buyer: null,
-        })) as unknown as DashboardOrder[];
-      } catch {
-        // Orders table might be empty
-      }
+          .order("created_at", { ascending: false });
 
-      setListings(listingsRes.data || []);
-      setOrders(orderData);
+        let orderData: DashboardOrder[] = [];
+        try {
+          const ordersRes = await supabase
+            .from("orders")
+            .select("id, amount, status, created_at, listing_id, buyer_id")
+            .eq("seller_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(5);
+          orderData = (ordersRes.data || []).map((o: Record<string, unknown>) => ({
+            ...o,
+            listings: null,
+            buyer: null,
+          })) as unknown as DashboardOrder[];
+        } catch {
+          // Orders query failed, continue with empty
+        }
+
+        setListings(listingsRes.data || []);
+        setOrders(orderData);
+      } catch {
+        // Fetch failed, show empty dashboard
+      }
       setLoading(false);
       setFetched(true);
     };
