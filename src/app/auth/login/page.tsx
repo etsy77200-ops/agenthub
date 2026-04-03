@@ -15,19 +15,32 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    supabase.auth.signInWithPassword({ email, password }).then(({ error }: any) => {
-      if (error) {
-        setError(error.message);
-        setLoading(false);
-      } else {
-        window.location.href = "/dashboard";
-      }
-    }).catch(() => {
-      setError("Login failed. Please check your connection and try again.");
-      setLoading(false);
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      },
+      body: JSON.stringify({ email, password }),
     });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data.msg || "Invalid login credentials");
+      setLoading(false);
+      return;
+    }
+
+    // Set the session in Supabase client
+    const supabase = createClient();
+    await supabase.auth.setSession({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+    });
+
+    window.location.href = "/dashboard";
   };
 
   return (
