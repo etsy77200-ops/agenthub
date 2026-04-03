@@ -51,22 +51,31 @@ export default function DashboardPage() {
     }
 
     const fetchData = async () => {
-      const [listingsRes, ordersRes] = await Promise.all([
-        supabase
-          .from("listings")
-          .select("id, title, price, order_count, status")
-          .eq("seller_id", user.id)
-          .order("created_at", { ascending: false }),
-        supabase
+      const listingsRes = await supabase
+        .from("listings")
+        .select("id, title, price, order_count, status")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false });
+
+      let orderData: DashboardOrder[] = [];
+      try {
+        const ordersRes = await supabase
           .from("orders")
-          .select("id, amount, status, created_at, listings(title), buyer:profiles!orders_buyer_id_fkey(name)")
+          .select("id, amount, status, created_at, listing_id, buyer_id")
           .eq("seller_id", user.id)
           .order("created_at", { ascending: false })
-          .limit(5),
-      ]);
+          .limit(5);
+        orderData = (ordersRes.data || []).map((o: Record<string, unknown>) => ({
+          ...o,
+          listings: null,
+          buyer: null,
+        })) as unknown as DashboardOrder[];
+      } catch {
+        // Orders table might be empty
+      }
 
       setListings(listingsRes.data || []);
-      setOrders((ordersRes.data as unknown as DashboardOrder[]) || []);
+      setOrders(orderData);
       setLoading(false);
     };
 
