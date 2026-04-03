@@ -15,24 +15,19 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-
+    const supabase = createClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supabase.auth.signInWithPassword({ email, password }).then(({ error }: any) => {
       if (error) {
         setError(error.message);
         setLoading(false);
-        return;
-      }
-
-      // Small delay to let auth state persist
-      setTimeout(() => {
+      } else {
         window.location.href = "/dashboard";
-      }, 500);
-    } catch {
+      }
+    }).catch(() => {
       setError("Login failed. Please check your connection and try again.");
       setLoading(false);
-    }
+    });
   };
 
   return (
