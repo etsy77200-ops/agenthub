@@ -23,9 +23,9 @@ export default function CreateListingPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [catsFetched, setCatsFetched] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
-  const supabase = createClient();
   const router = useRouter();
 
   useEffect(() => {
@@ -33,13 +33,16 @@ export default function CreateListingPage() {
       router.push("/auth/login");
       return;
     }
+    if (catsFetched) return;
 
+    const supabase = createClient();
     const fetchCategories = async () => {
       const { data } = await supabase.from("categories").select("*").order("name");
       setCategories(data || []);
+      setCatsFetched(true);
     };
     fetchCategories();
-  }, [user, authLoading, router, supabase]);
+  }, [user, authLoading, router, catsFetched]);
 
   const handleSubmit = async (e: React.FormEvent, status: "active" | "draft") => {
     e.preventDefault();
@@ -48,6 +51,7 @@ export default function CreateListingPage() {
     setError("");
     setLoading(true);
 
+    const supabase = createClient();
     const { error } = await supabase.from("listings").insert({
       seller_id: user.id,
       title,

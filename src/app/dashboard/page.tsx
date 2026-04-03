@@ -40,7 +40,7 @@ export default function DashboardPage() {
   const [listings, setListings] = useState<DashboardListing[]>([]);
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const [fetched, setFetched] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -49,6 +49,9 @@ export default function DashboardPage() {
       router.push("/auth/login");
       return;
     }
+    if (fetched) return;
+
+    const supabase = createClient();
 
     const fetchData = async () => {
       const listingsRes = await supabase
@@ -77,10 +80,11 @@ export default function DashboardPage() {
       setListings(listingsRes.data || []);
       setOrders(orderData);
       setLoading(false);
+      setFetched(true);
     };
 
     fetchData();
-  }, [user, authLoading, router, supabase]);
+  }, [user, authLoading, router, fetched]);
 
   if (authLoading || loading) {
     return (
