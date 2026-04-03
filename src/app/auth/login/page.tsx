@@ -33,14 +33,15 @@ export default function LoginPage() {
       return;
     }
 
-    // Set the session in Supabase client
+    // Set the session in Supabase client — don't await, just redirect
     const supabase = createClient();
-    await supabase.auth.setSession({
+    supabase.auth.setSession({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
     });
 
-    window.location.href = "/dashboard";
+    // Redirect immediately
+    window.location.replace("/dashboard");
   };
 
   return (
