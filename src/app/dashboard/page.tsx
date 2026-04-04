@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { createClient } from "@/lib/supabase";
+import { restGetJson } from "@/lib/supabase-rest";
 import { useRouter } from "next/navigation";
 import StripeConnectButton from "@/components/StripeConnectButton";
 
@@ -46,39 +46,44 @@ export default function DashboardPage() {
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.push("/auth/login");
+      setLoading(false);
+      router.replace("/auth/login");
       return;
     }
     if (fetched) return;
 
-    const supabase = createClient();
+    const seller = encodeURIComponent(user.id);
 
     const fetchData = async () => {
       try {
-        const listingsRes = await supabase
-          .from("listings")
-          .select("id, title, price, order_count, status")
-          .eq("seller_id", user.id)
-          .order("created_at", { ascending: false });
+        const listingsRows = await restGetJson<DashboardListing[]>(
+          `listings?select=id,title,price,order_count,status&seller_id=eq.${seller}&order=created_at.desc`
+        );
 
         let orderData: DashboardOrder[] = [];
         try {
-          const ordersRes = await supabase
-            .from("orders")
-            .select("id, amount, status, created_at, listing_id, buyer_id")
-            .eq("seller_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(5);
-          orderData = (ordersRes.data || []).map((o: Record<string, unknown>) => ({
+          const orderRows = await restGetJson<
+            Array<{
+              id: string;
+              amount: number;
+              status: string;
+              created_at: string;
+              listing_id: string;
+              buyer_id: string;
+            }>
+          >(
+            `orders?select=id,amount,status,created_at,listing_id,buyer_id&seller_id=eq.${seller}&order=created_at.desc&limit=5`
+          );
+          orderData = (orderRows || []).map((o) => ({
             ...o,
             listings: null,
             buyer: null,
-          })) as unknown as DashboardOrder[];
+          })) as DashboardOrder[];
         } catch {
           // Orders query failed, continue with empty
         }
 
-        setListings(listingsRes.data || []);
+        setListings(Array.isArray(listingsRows) ? listingsRows : []);
         setOrders(orderData);
       } catch {
         // Fetch failed, show empty dashboard
@@ -88,10 +93,25 @@ export default function DashboardPage() {
     };
 
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, fetched]);
+  }, [authLoading, user, fetched, router]);
 
-  if (authLoading || loading) {
+  if (authLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center">
+        <div className="animate-pulse text-muted">Loading dashboard...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-16 text-center text-muted">
+        Redirecting to login…
+      </div>
+    );
+  }
+
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
         <div className="animate-pulse text-muted">Loading dashboard...</div>

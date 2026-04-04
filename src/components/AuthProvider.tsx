@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import { raceWithTimeout, readStoredAuthFromLocalStorage, restGetJson } from "@/lib/supabase-rest";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface Profile {
@@ -36,74 +37,79 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const initialized = useRef(false);
 
   useEffect(() => {
-    if (initialized.current) return;
-    initialized.current = true;
-
     const supabase = createClient();
+    const snap = readStoredAuthFromLocalStorage();
 
-    // Read session — try getSession first, fall back to localStorage
+    // Immediate hydration from the same localStorage login uses (no await — fixes stuck Navbar/dashboard).
+    if (snap.user) {
+      setUser(snap.user as SupabaseUser);
+      setLoading(false);
+    }
+
     const loadSession = async () => {
-      let currentUser = null;
+      let currentUser: SupabaseUser | null = (snap.user as SupabaseUser | null) ?? null;
 
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: { session } }: any = await supabase.auth.getSession();
-        currentUser = session?.user ?? null;
-      } catch {
-        // getSession failed, try localStorage
-      }
-
-      // Fallback: read directly from localStorage
-      if (!currentUser) {
-        try {
-          const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/https:\/\/([^.]+)/)?.[1];
-          const storageKey = `sb-${projectRef}-auth-token`;
-          const stored = localStorage.getItem(storageKey);
-          if (stored) {
-            const session = JSON.parse(stored);
-            currentUser = session.user ?? null;
+        if (snap.access_token && snap.refresh_token) {
+          const sessionOutcome = await raceWithTimeout(
+            supabase.auth.setSession({
+              access_token: snap.access_token,
+              refresh_token: snap.refresh_token,
+            }),
+            4000
+          );
+          if (sessionOutcome !== "timeout") {
+            const { data, error } = sessionOutcome as {
+              data: { session: { user: SupabaseUser } | null };
+              error: Error | null;
+            };
+            if (!error && data.session?.user) {
+              currentUser = data.session.user;
+            }
           }
-        } catch {
-          // localStorage read failed
         }
-      }
 
-      setUser(currentUser);
-
-      if (currentUser) {
-        try {
-          const { data } = await supabase
-            .from("profiles")
-            .select("*")
-            .eq("id", currentUser.id)
-            .single();
-          setProfile(data);
-        } catch {
-          // Profile fetch failed
+        if (!currentUser) {
+          const sessionOutcome = await raceWithTimeout(supabase.auth.getSession(), 3000);
+          if (sessionOutcome !== "timeout") {
+            const { data } = sessionOutcome as {
+              data: { session: { user: SupabaseUser } | null };
+            };
+            currentUser = data.session?.user ?? null;
+          }
         }
-      }
 
-      setLoading(false);
+        setUser(currentUser);
+
+        if (currentUser) {
+          const uid = encodeURIComponent(currentUser.id);
+          void restGetJson<Profile[]>(`profiles?select=*&id=eq.${uid}`, 12000)
+            .then((rows) => setProfile(rows[0] ?? null))
+            .catch(() => setProfile(null));
+        } else {
+          setProfile(null);
+        }
+      } catch {
+        setUser((snap.user as SupabaseUser | null) ?? null);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    loadSession();
+    void loadSession();
 
-    // Listen for auth state changes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
 
       if (currentUser) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single();
-        setProfile(data);
+        const uid = encodeURIComponent(currentUser.id);
+        void restGetJson<Profile[]>(`profiles?select=*&id=eq.${uid}`, 12000)
+          .then((rows) => setProfile(rows[0] ?? null))
+          .catch(() => setProfile(null));
       } else {
         setProfile(null);
       }
@@ -115,10 +121,23 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const signOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    const key = readStoredAuthFromLocalStorage().storageKey ?? undefined;
+    if (key) {
+      try {
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      const supabase = createClient();
+      await raceWithTimeout(supabase.auth.signOut(), 3000);
+    } catch {
+      /* ignore */
+    }
     setUser(null);
     setProfile(null);
+    setLoading(false);
   };
 
   return (
