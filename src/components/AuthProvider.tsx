@@ -44,24 +44,54 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
 
     const supabase = createClient();
 
-    // Use getSession for faster initial load
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    supabase.auth.getSession().then(async ({ data: { session } }: any) => {
-      const currentUser = session?.user ?? null;
+    // Read session — try getSession first, fall back to localStorage
+    const loadSession = async () => {
+      let currentUser = null;
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: { session } }: any = await supabase.auth.getSession();
+        currentUser = session?.user ?? null;
+      } catch {
+        // getSession failed, try localStorage
+      }
+
+      // Fallback: read directly from localStorage
+      if (!currentUser) {
+        try {
+          const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/https:\/\/([^.]+)/)?.[1];
+          const storageKey = `sb-${projectRef}-auth-token`;
+          const stored = localStorage.getItem(storageKey);
+          if (stored) {
+            const session = JSON.parse(stored);
+            currentUser = session.user ?? null;
+          }
+        } catch {
+          // localStorage read failed
+        }
+      }
+
       setUser(currentUser);
 
       if (currentUser) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", currentUser.id)
-          .single();
-        setProfile(data);
+        try {
+          const { data } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", currentUser.id)
+            .single();
+          setProfile(data);
+        } catch {
+          // Profile fetch failed
+        }
       }
 
       setLoading(false);
-    });
+    };
 
+    loadSession();
+
+    // Listen for auth state changes
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: any, session: any) => {
       const currentUser = session?.user ?? null;
