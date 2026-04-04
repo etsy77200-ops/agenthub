@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -14,38 +15,18 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      },
-      body: JSON.stringify({ email, password }),
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
     });
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      setError(data.msg || "Invalid login credentials");
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
       return;
     }
 
-    // Manually store session in localStorage in the format Supabase expects
-    // This bypasses setSession() which hangs in this environment
-    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/https:\/\/([^.]+)/)?.[1];
-    const storageKey = `sb-${projectRef}-auth-token`;
-    localStorage.setItem(storageKey, JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_in: data.expires_in,
-      expires_at: data.expires_at,
-      token_type: data.token_type,
-      user: data.user,
-    }));
-
-    // Redirect immediately — AuthProvider will pick up the session from localStorage
     window.location.replace("/dashboard");
   };
 

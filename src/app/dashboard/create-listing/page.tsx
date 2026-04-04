@@ -53,7 +53,8 @@ export default function CreateListingPage() {
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.from("listings").insert({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("listings") as any).insert({
       seller_id: user.id,
       title,
       short_description: shortDesc,
