@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createClient } from "@/lib/supabase";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -33,26 +32,21 @@ export default function LoginPage() {
       return;
     }
 
-    // Store tokens manually so the session persists across page load
-    const supabase = createClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: any) => {
-      if (event === "SIGNED_IN") {
-        subscription.unsubscribe();
-        window.location.replace("/dashboard");
-      }
-    });
-
-    // Set session — this triggers the SIGNED_IN event above
-    supabase.auth.setSession({
+    // Manually store session in localStorage in the format Supabase expects
+    // This bypasses setSession() which hangs in this environment
+    const projectRef = process.env.NEXT_PUBLIC_SUPABASE_URL!.match(/https:\/\/([^.]+)/)?.[1];
+    const storageKey = `sb-${projectRef}-auth-token`;
+    localStorage.setItem(storageKey, JSON.stringify({
       access_token: data.access_token,
       refresh_token: data.refresh_token,
-    });
+      expires_in: data.expires_in,
+      expires_at: data.expires_at,
+      token_type: data.token_type,
+      user: data.user,
+    }));
 
-    // Fallback redirect after 3 seconds if event doesn't fire
-    setTimeout(() => {
-      window.location.replace("/dashboard");
-    }, 3000);
+    // Redirect immediately — AuthProvider will pick up the session from localStorage
+    window.location.replace("/dashboard");
   };
 
   return (
