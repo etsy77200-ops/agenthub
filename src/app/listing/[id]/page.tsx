@@ -142,7 +142,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
               <div>
                 <p className="text-sm font-medium text-foreground">Try the demo first</p>
                 <p className="text-xs text-muted">
-                  See how this agent works before you pay. Opens in a new tab.
+                  Opens in a new tab — video, live app, or sandbox where you can try it before you pay.
                 </p>
               </div>
               <a

@@ -57,7 +57,7 @@ export default function CreateListingPage() {
     if (status === "active") {
       if (!demoParsed) {
         setError(
-          "A demo URL is required to publish. Buyers must be able to preview your agent (video, live app, or walkthrough)."
+          "A demo URL is required to publish. Buyers must be able to open a preview (video, live app, or interactive sandbox)."
         );
         setLoading(false);
         return;
@@ -215,12 +215,13 @@ export default function CreateListingPage() {
             type="url"
             value={demoUrl}
             onChange={(e) => setDemoUrl(e.target.value)}
-            placeholder="https://www.loom.com/share/... or https://..."
+            placeholder="https://codesandbox.io/... or https://www.loom.com/share/..."
             className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
           <p className="text-xs text-muted mt-1">
-            Link to a short video (Loom, YouTube), live demo, or sandbox so buyers can see the agent work before paying.
-            Drafts can be saved without a demo; publishing requires a valid https link.
+            Use a public <strong className="font-medium text-foreground">https</strong> link buyers can open in a new tab: Loom/YouTube walkthrough, a staging app, or an{" "}
+            <strong className="font-medium text-foreground">interactive sandbox</strong> (e.g. CodeSandbox, StackBlitz, Replit) so they can try the agent themselves.
+            Drafts can be saved without a demo; publishing requires a valid URL.
           </p>
           {demoUrl.trim() && !parseDemoUrl(demoUrl) && (
             <p className="text-xs text-amber-700 mt-1">{demoUrlErrorMessage()}</p>
