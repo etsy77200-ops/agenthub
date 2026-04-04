@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAuth } from "@/components/AuthProvider";
-import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { PLATFORM_FEE_PERCENT } from "@/lib/constants";
-
-// SET YOUR ADMIN EMAIL HERE
-const ADMIN_EMAIL = "etsy77200@gmail.com";
 
 interface UserRow {
   id: string;
@@ -39,50 +33,45 @@ interface ListingRow {
   created_at: string;
 }
 
+/**
+ * Route access: middleware + ADMIN_EMAIL + Supabase cookies.
+ * Data: GET /api/admin/data (same checks + RLS is_admin — see supabase-admin-secure.sql).
+ */
 export default function AdminPage() {
-  const { user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [listings, setListings] = useState<ListingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "orders" | "listings">("overview");
-
   const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user || user.email !== ADMIN_EMAIL) {
-      router.push("/");
-      return;
-    }
     if (fetched) return;
 
-    const supabase = createClient();
-
-    const fetchAll = async () => {
-      try {
-        const [usersRes, ordersRes, listingsRes] = await Promise.all([
-          supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-          supabase.from("orders").select("*").order("created_at", { ascending: false }),
-          supabase.from("listings").select("*").order("created_at", { ascending: false }),
-        ]);
-
-        setUsers(usersRes.data || []);
-        setOrders(ordersRes.data || []);
-        setListings(listingsRes.data || []);
-      } catch {
-        // Failed to fetch
+    const load = async () => {
+      const res = await fetch("/api/admin/data", { credentials: "same-origin" });
+      if (!res.ok) {
+        router.replace("/");
+        setLoading(false);
+        return;
       }
+      const data = (await res.json()) as {
+        users: UserRow[];
+        orders: OrderRow[];
+        listings: ListingRow[];
+      };
+      setUsers(data.users ?? []);
+      setOrders(data.orders ?? []);
+      setListings(data.listings ?? []);
       setLoading(false);
       setFetched(true);
     };
 
-    fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, fetched]);
+    void load();
+  }, [fetched, router]);
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-16 text-center">
         <div className="animate-pulse text-muted">Loading admin dashboard...</div>
@@ -90,9 +79,6 @@ export default function AdminPage() {
     );
   }
 
-  if (!user || user.email !== ADMIN_EMAIL) return null;
-
-  // Calculate stats
   const totalUsers = users.length;
   const totalSellers = users.filter((u) => u.role === "seller" || u.role === "both").length;
   const totalBuyers = users.filter((u) => u.role === "buyer" || u.role === "both").length;
@@ -103,9 +89,6 @@ export default function AdminPage() {
   const pendingOrders = orders.filter((o) => o.status === "pending").length;
   const totalRevenue = orders.reduce((sum, o) => sum + Number(o.amount), 0);
   const platformEarnings = orders.reduce((sum, o) => sum + Number(o.platform_fee), 0);
-  const completedRevenue = orders
-    .filter((o) => o.status === "completed")
-    .reduce((sum, o) => sum + Number(o.amount), 0);
   const completedPlatformEarnings = orders
     .filter((o) => o.status === "completed")
     .reduce((sum, o) => sum + Number(o.platform_fee), 0);
@@ -128,14 +111,14 @@ export default function AdminPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted mt-1">Platform overview — only visible to you</p>
+        <p className="text-muted mt-1">Platform overview — owner only (server + database enforced)</p>
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 mb-8 border-b border-border">
         {(["overview", "users", "orders", "listings"] as const).map((tab) => (
           <button
             key={tab}
+            type="button"
             onClick={() => setActiveTab(tab)}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors capitalize ${
               activeTab === tab
@@ -148,10 +131,8 @@ export default function AdminPage() {
         ))}
       </div>
 
-      {/* Overview Tab */}
       {activeTab === "overview" && (
         <div>
-          {/* Earnings Row */}
           <h2 className="text-lg font-semibold mb-3">Your Earnings (15% commission)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="border border-border rounded-xl p-5 bg-primary/5">
@@ -176,7 +157,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Platform Stats */}
           <h2 className="text-lg font-semibold mb-3">Platform Stats</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="border border-border rounded-xl p-5">
@@ -201,7 +181,6 @@ export default function AdminPage() {
             </div>
           </div>
 
-          {/* Recent Activity */}
           <h2 className="text-lg font-semibold mb-3">Recent Signups</h2>
           <div className="border border-border rounded-xl overflow-hidden">
             <table className="w-full">
@@ -235,7 +214,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Users Tab */}
       {activeTab === "users" && (
         <div>
           <h2 className="text-lg font-semibold mb-3">All Users ({totalUsers})</h2>
@@ -279,7 +257,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Orders Tab */}
       {activeTab === "orders" && (
         <div>
           <h2 className="text-lg font-semibold mb-3">All Orders ({totalOrders})</h2>
@@ -317,7 +294,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Listings Tab */}
       {activeTab === "listings" && (
         <div>
           <h2 className="text-lg font-semibold mb-3">All Listings ({totalListings})</h2>

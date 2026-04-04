@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { createClient } from "@/lib/supabase";
+import { raceWithTimeout } from "@/lib/supabase-rest";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -43,6 +45,15 @@ export default function LoginPage() {
       token_type: data.token_type,
       user: data.user,
     }));
+
+    // Sync session into cookies so server middleware (e.g. /admin) and API routes see the user.
+    await raceWithTimeout(
+      createClient().auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      }),
+      8000
+    );
 
     window.location.replace("/dashboard");
   };
