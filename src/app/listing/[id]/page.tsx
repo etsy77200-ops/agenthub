@@ -20,6 +20,7 @@ interface ListingData {
   review_count: number;
   order_count: number;
   demo_url?: string;
+  status: string;
   created_at: string;
   seller: {
     id: string;
@@ -136,6 +137,29 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
 
           <h1 className="text-3xl font-bold mb-4">{listing.title}</h1>
 
+          {listing.demo_url ? (
+            <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-foreground">Try the demo first</p>
+                <p className="text-xs text-muted">
+                  See how this agent works before you pay. Opens in a new tab.
+                </p>
+              </div>
+              <a
+                href={listing.demo_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-dark shrink-0"
+              >
+                Open demo
+              </a>
+            </div>
+          ) : listing.status === "active" ? (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              This listing has no demo link yet, so checkout is disabled. Contact the seller or choose another agent.
+            </div>
+          ) : null}
+
           <div className="flex items-center gap-4 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -223,11 +247,20 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             {!showOrderForm ? (
               <>
                 <button
+                  type="button"
                   onClick={() => setShowOrderForm(true)}
-                  className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors mb-3"
+                  disabled={!listing.demo_url || listing.status !== "active"}
+                  className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Order Now
                 </button>
+                {(!listing.demo_url || listing.status !== "active") && (
+                  <p className="text-xs text-muted mb-3 text-center">
+                    {!listing.demo_url && listing.status === "active"
+                      ? "A demo is required before purchase."
+                      : "This listing is not available for purchase."}
+                  </p>
+                )}
                 <button className="w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-gray-200 transition-colors">
                   Contact Seller
                 </button>

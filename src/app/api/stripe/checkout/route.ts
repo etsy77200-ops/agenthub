@@ -25,9 +25,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Listing not found" }, { status: 404 });
     }
 
+    if (listing.status !== "active") {
+      return NextResponse.json({ error: "This listing is not available for purchase." }, { status: 400 });
+    }
+
     // Don't allow buying your own listing
     if (listing.seller_id === user.id) {
       return NextResponse.json({ error: "Cannot buy your own listing" }, { status: 400 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const demo = String((listing as any).demo_url ?? "").trim();
+    if (listing.status === "active" && !demo) {
+      return NextResponse.json(
+        { error: "This listing does not include a demo URL and cannot be purchased." },
+        { status: 400 }
+      );
     }
 
     const amountInCents = Math.round(listing.price * 100);

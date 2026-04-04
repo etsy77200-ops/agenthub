@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
+import { demoUrlErrorMessage, parseDemoUrl } from "@/lib/demo-url";
 
 interface Category {
   id: string;
@@ -52,6 +53,17 @@ export default function CreateListingPage() {
     setError("");
     setLoading(true);
 
+    const demoParsed = parseDemoUrl(demoUrl);
+    if (status === "active") {
+      if (!demoParsed) {
+        setError(
+          "A demo URL is required to publish. Buyers must be able to preview your agent (video, live app, or walkthrough)."
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
     const supabase = createClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { error } = await (supabase.from("listings") as any).insert({
@@ -63,7 +75,7 @@ export default function CreateListingPage() {
       price: Number(price),
       price_type: priceType,
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      demo_url: demoUrl || null,
+      demo_url: demoParsed,
       status,
     });
 
@@ -198,14 +210,21 @@ export default function CreateListingPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1.5">Demo URL (optional)</label>
+          <label className="block text-sm font-medium mb-1.5">Demo URL {`(required to publish)`}</label>
           <input
             type="url"
             value={demoUrl}
             onChange={(e) => setDemoUrl(e.target.value)}
-            placeholder="https://demo.youragent.com"
+            placeholder="https://www.loom.com/share/... or https://..."
             className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
           />
+          <p className="text-xs text-muted mt-1">
+            Link to a short video (Loom, YouTube), live demo, or sandbox so buyers can see the agent work before paying.
+            Drafts can be saved without a demo; publishing requires a valid https link.
+          </p>
+          {demoUrl.trim() && !parseDemoUrl(demoUrl) && (
+            <p className="text-xs text-amber-700 mt-1">{demoUrlErrorMessage()}</p>
+          )}
         </div>
 
         <div className="flex gap-3 pt-4">
