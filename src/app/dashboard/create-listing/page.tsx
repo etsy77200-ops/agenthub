@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { demoUrlErrorMessage, parseDemoUrl } from "@/lib/demo-url";
+import { getStoredAccessToken } from "@/lib/supabase-rest";
 
 interface Category {
   id: string;
@@ -25,6 +27,8 @@ export default function CreateListingPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [catsFetched, setCatsFetched] = useState(false);
+  const [payoutLoading, setPayoutLoading] = useState(true);
+  const [payoutReady, setPayoutReady] = useState(false);
 
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
@@ -46,6 +50,36 @@ export default function CreateListingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authLoading, catsFetched]);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers: HeadersInit = { Accept: "application/json" };
+        const t = getStoredAccessToken();
+        if (t) headers.Authorization = `Bearer ${t}`;
+        const res = await fetch("/api/seller/payout-readiness", {
+          headers,
+          credentials: "include",
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          const j = (await res.json()) as { payout_ready?: boolean };
+          setPayoutReady(Boolean(j.payout_ready));
+        } else {
+          setPayoutReady(false);
+        }
+      } catch {
+        if (!cancelled) setPayoutReady(false);
+      } finally {
+        if (!cancelled) setPayoutLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user]);
+
   const handleSubmit = async (e: React.FormEvent, status: "active" | "draft") => {
     e.preventDefault();
     if (!user) return;
@@ -64,27 +98,30 @@ export default function CreateListingPage() {
       }
     }
 
-    const supabase = createClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from("listings") as any).insert({
-      seller_id: user.id,
-      title,
-      short_description: shortDesc,
-      description,
-      category_id: category || null,
-      price: Number(price),
-      price_type: priceType,
-      tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
-      demo_url: demoParsed,
-      status,
+    const res = await fetch("/api/listings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title,
+        short_description: shortDesc,
+        description,
+        category_id: category || null,
+        price: Number(price),
+        price_type: priceType,
+        tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
+        demo_url: demoUrl,
+        status,
+      }),
     });
 
-    if (error) {
-      setError(error.message);
+    const payload = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      setError(payload.error || "Something went wrong");
       setLoading(false);
-    } else {
-      router.push("/dashboard");
+      return;
     }
+
+    router.push("/dashboard");
   };
 
   if (authLoading) {
@@ -103,6 +140,22 @@ export default function CreateListingPage() {
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
           {error}
+        </div>
+      )}
+
+      {!payoutLoading && !payoutReady && (
+        <div className="mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-950 text-sm">
+          <p className="font-medium mb-1">Finish payout setup to publish</p>
+          <p className="text-amber-900/90 mb-3">
+            Connect Stripe from your dashboard and complete onboarding so buyers can pay you. Until then, you can still
+            save listings as <strong className="font-medium">draft</strong>.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-flex text-sm font-medium text-amber-950 underline hover:no-underline"
+          >
+            Go to dashboard &rarr; Connect Stripe
+          </Link>
         </div>
       )}
 
@@ -231,7 +284,12 @@ export default function CreateListingPage() {
         <div className="flex gap-3 pt-4">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || payoutLoading || !payoutReady}
+            title={
+              !payoutReady && !payoutLoading
+                ? "Complete Stripe Connect payout setup before publishing"
+                : undefined
+            }
             className="px-8 py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
           >
             {loading ? "Publishing..." : "Publish Listing"}

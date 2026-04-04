@@ -36,12 +36,22 @@ const statusColors: Record<string, string> = {
 };
 
 export default function DashboardPage() {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const [listings, setListings] = useState<DashboardListing[]>([]);
   const [orders, setOrders] = useState<DashboardOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetched, setFetched] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stripe = new URLSearchParams(window.location.search).get("stripe");
+    if (stripe !== "success" && stripe !== "refresh") return;
+    void (async () => {
+      await refreshProfile();
+      router.replace("/dashboard");
+    })();
+  }, [refreshProfile, router]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -128,10 +138,18 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted mt-1">Welcome back, {profile?.name || "there"}!</p>
+          <p className="text-muted mt-1">
+            Welcome back, {profile?.name || user?.email?.split("@")[0] || "there"}!
+          </p>
         </div>
         <div className="flex items-center gap-3">
-          <StripeConnectButton />
+          <div className="flex flex-col items-end gap-1">
+            <StripeConnectButton />
+            <p className="text-xs text-muted max-w-[14rem] text-right leading-snug max-sm:hidden">
+              Stripe opens in a new tab. When your account is linked, you&apos;ll see a green &quot;Stripe connected&quot;
+              label and can open Express anytime.
+            </p>
+          </div>
           <Link
             href="/dashboard/create-listing"
             className="px-5 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors"

@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
+import { getConnectPayoutFlags } from "@/lib/stripe-connect-payout";
 import { stripe, PLATFORM_FEE_PERCENT } from "@/lib/stripe";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSupabaseUserFromRequest } from "@/lib/supabase-route-user";
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const got = await getSupabaseUserFromRequest(req);
+    if (!got) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+    const { user, supabase } = got;
 
     const { listing_id, requirements } = await req.json();
 
@@ -39,6 +38,25 @@ export async function POST(req: NextRequest) {
     if (listing.status === "active" && !demo) {
       return NextResponse.json(
         { error: "This listing does not include a demo URL and cannot be purchased." },
+        { status: 400 }
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rawSeller = (listing as any).seller as
+      | { stripe_account_id?: string | null }
+      | { stripe_account_id?: string | null }[]
+      | null
+      | undefined;
+    const sellerRow = Array.isArray(rawSeller) ? rawSeller[0] : rawSeller;
+    const sellerStripeAccountId = sellerRow?.stripe_account_id?.trim() || null;
+    const { payout_ready } = await getConnectPayoutFlags(sellerStripeAccountId);
+    if (!payout_ready) {
+      return NextResponse.json(
+        {
+          error:
+            "This listing cannot be purchased yet because the seller has not finished Stripe payout setup.",
+        },
         { status: 400 }
       );
     }
@@ -75,20 +93,19 @@ export async function POST(req: NextRequest) {
       cancel_url: `${req.nextUrl.origin}/listing/${listing.id}?cancelled=true`,
     };
 
-    // If seller has Stripe account, use Connect with application fee
-    if (listing.seller?.stripe_account_id) {
+    // Use normalized seller row — PostgREST may return seller as an array; listing.seller?.stripe_account_id would be wrong.
+    if (sellerStripeAccountId) {
       sessionParams.payment_intent_data = {
         application_fee_amount: platformFee,
         transfer_data: {
-          destination: listing.seller.stripe_account_id,
+          destination: sellerStripeAccountId,
         },
       };
     }
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // Create order in database
-    await supabase.from("orders").insert({
+    const { error: insertError } = await supabase.from("orders").insert({
       buyer_id: user.id,
       listing_id: listing.id,
       seller_id: listing.seller_id,
@@ -98,6 +115,19 @@ export async function POST(req: NextRequest) {
       stripe_payment_id: session.id,
       status: "pending",
     });
+
+    if (insertError) {
+      console.error("Checkout order insert:", insertError);
+      try {
+        await stripe.checkout.sessions.expire(session.id);
+      } catch {
+        /* ignore */
+      }
+      return NextResponse.json(
+        { error: "Could not create your order. You were not charged. Please try again." },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ url: session.url });
   } catch (err) {

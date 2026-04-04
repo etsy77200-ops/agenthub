@@ -4,9 +4,17 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { MOCK_LISTINGS } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
+import { SellerPayoutTrust } from "@/components/SellerPayoutTrust";
 import { createClient } from "@/lib/supabase";
+import { getStoredAccessToken } from "@/lib/supabase-rest";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+
+type PayoutTrustState =
+  | { kind: "idle" }
+  | { kind: "loading" }
+  | { kind: "ok"; payout_ready: boolean; setup_started: boolean }
+  | { kind: "hidden" };
 
 interface ListingData {
   id: string;
@@ -41,6 +49,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
   const supabase = createClient();
   const [listing, setListing] = useState<ListingData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [payoutTrust, setPayoutTrust] = useState<PayoutTrustState>({ kind: "idle" });
   const [ordering, setOrdering] = useState(false);
   const [requirements, setRequirements] = useState("");
   const [showOrderForm, setShowOrderForm] = useState(false);
@@ -54,7 +63,24 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         .single();
 
       if (data) {
-        setListing(data as unknown as ListingData);
+        const row = data as unknown as ListingData;
+        setListing(row);
+        setPayoutTrust({ kind: "loading" });
+        try {
+          const r = await fetch(`/api/listings/${row.id}/payout-status`);
+          if (r.ok) {
+            const j = (await r.json()) as { payout_ready?: boolean; setup_started?: boolean };
+            setPayoutTrust({
+              kind: "ok",
+              payout_ready: Boolean(j.payout_ready),
+              setup_started: Boolean(j.setup_started),
+            });
+          } else {
+            setPayoutTrust({ kind: "hidden" });
+          }
+        } catch {
+          setPayoutTrust({ kind: "hidden" });
+        }
       } else {
         // Fallback to mock data for demo
         const mock = MOCK_LISTINGS.find((l) => l.id === id);
@@ -65,6 +91,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             category: null,
           } as unknown as ListingData);
         }
+        setPayoutTrust({ kind: "hidden" });
       }
       setLoading(false);
     };
@@ -79,9 +106,13 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
 
     setOrdering(true);
     try {
+      const headers: HeadersInit = { "Content-Type": "application/json", Accept: "application/json" };
+      const t = getStoredAccessToken();
+      if (t) headers.Authorization = `Bearer ${t}`;
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
+        credentials: "include",
         body: JSON.stringify({
           listing_id: listing!.id,
           requirements,
@@ -119,6 +150,8 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
       </div>
     );
   }
+
+  const checkoutBlockedByPayout = payoutTrust.kind === "ok" && !payoutTrust.payout_ready;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -160,7 +193,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
             </div>
           ) : null}
 
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-6">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                 <span className="text-sm font-medium text-primary">
@@ -169,6 +202,19 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
               </div>
               <span className="font-medium">{listing.seller?.name}</span>
             </div>
+            {payoutTrust.kind !== "idle" && payoutTrust.kind !== "hidden" && (
+              <SellerPayoutTrust
+                state={
+                  payoutTrust.kind === "loading"
+                    ? { kind: "loading" }
+                    : {
+                        kind: "ok",
+                        payout_ready: payoutTrust.payout_ready,
+                        setup_started: payoutTrust.setup_started,
+                      }
+                }
+              />
+            )}
             <div className="flex items-center gap-1">
               <svg className="w-5 h-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -249,16 +295,22 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                 <button
                   type="button"
                   onClick={() => setShowOrderForm(true)}
-                  disabled={!listing.demo_url || listing.status !== "active"}
+                  disabled={
+                    !listing.demo_url || listing.status !== "active" || checkoutBlockedByPayout
+                  }
                   className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Order Now
                 </button>
-                {(!listing.demo_url || listing.status !== "active") && (
+                {(!listing.demo_url || listing.status !== "active" || checkoutBlockedByPayout) && (
                   <p className="text-xs text-muted mb-3 text-center">
-                    {!listing.demo_url && listing.status === "active"
-                      ? "A demo is required before purchase."
-                      : "This listing is not available for purchase."}
+                    {listing.status !== "active"
+                      ? "This listing is not available for purchase."
+                      : checkoutBlockedByPayout
+                        ? "Checkout is unavailable until the seller finishes Stripe payout setup."
+                        : !listing.demo_url
+                          ? "A demo is required before purchase."
+                          : "This listing is not available for purchase."}
                   </p>
                 )}
                 <button className="w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-gray-200 transition-colors">
@@ -279,7 +331,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                 </div>
                 <button
                   onClick={handleOrder}
-                  disabled={ordering}
+                  disabled={ordering || checkoutBlockedByPayout}
                   className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
                   {ordering ? "Redirecting to payment..." : `Pay $${listing.price}`}
@@ -320,6 +372,21 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                 <div>
                   <div className="font-medium">{listing.seller?.name}</div>
                   <div className="text-xs text-muted">Member since {listing.seller?.created_at?.slice(0, 7)}</div>
+                  {payoutTrust.kind !== "idle" && payoutTrust.kind !== "hidden" && (
+                    <div className="mt-2">
+                      <SellerPayoutTrust
+                        state={
+                          payoutTrust.kind === "loading"
+                            ? { kind: "loading" }
+                            : {
+                                kind: "ok",
+                                payout_ready: payoutTrust.payout_ready,
+                                setup_started: payoutTrust.setup_started,
+                              }
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               <p className="text-sm text-muted">{listing.seller?.bio}</p>

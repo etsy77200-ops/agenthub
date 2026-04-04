@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
-import { createServerSupabaseClient } from "@/lib/supabase-server";
+import { getSupabaseUserFromRequest } from "@/lib/supabase-route-user";
 
 // Create Stripe Connect account for sellers
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) {
+    const got = await getSupabaseUserFromRequest(req);
+    if (!got) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+
+    const { user, supabase } = got;
 
     // Get user profile
     const { data: profile } = await supabase
@@ -42,11 +42,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Save Stripe account ID to profile
-    await supabase
+    const { error: saveError } = await supabase
       .from("profiles")
       .update({ stripe_account_id: account.id })
       .eq("id", user.id);
+
+    if (saveError) {
+      console.error("Stripe Connect profile update:", saveError);
+      return NextResponse.json(
+        { error: "Could not save your Stripe account on your profile. Check Supabase RLS and the stripe_account_id column." },
+        { status: 500 }
+      );
+    }
 
     // Create onboarding link
     const accountLink = await stripe.accountLinks.create({

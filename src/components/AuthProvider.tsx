@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import { raceWithTimeout, readStoredAuthFromLocalStorage, restGetJson } from "@/lib/supabase-rest";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -22,6 +22,8 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  /** Re-load profile from Supabase (e.g. after Stripe Connect return). */
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   signOut: async () => {},
+  refreshProfile: async () => {},
 });
 
 export function useAuth() {
@@ -39,6 +42,27 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const userRef = useRef<SupabaseUser | null>(null);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  const fetchProfileForUserId = useCallback(async (userId: string) => {
+    const uid = encodeURIComponent(userId);
+    try {
+      const rows = await restGetJson<Profile[]>(`profiles?select=*&id=eq.${uid}`, 12000);
+      setProfile(rows[0] ?? null);
+    } catch {
+      setProfile(null);
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const id = userRef.current?.id;
+    if (!id) return;
+    await fetchProfileForUserId(id);
+  }, [fetchProfileForUserId]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -86,10 +110,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         setUser(currentUser);
 
         if (currentUser) {
-          const uid = encodeURIComponent(currentUser.id);
-          void restGetJson<Profile[]>(`profiles?select=*&id=eq.${uid}`, 12000)
-            .then((rows) => setProfile(rows[0] ?? null))
-            .catch(() => setProfile(null));
+          void fetchProfileForUserId(currentUser.id);
         } else {
           setProfile(null);
         }
@@ -108,10 +129,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       setUser(currentUser);
 
       if (currentUser) {
-        const uid = encodeURIComponent(currentUser.id);
-        void restGetJson<Profile[]>(`profiles?select=*&id=eq.${uid}`, 12000)
-          .then((rows) => setProfile(rows[0] ?? null))
-          .catch(() => setProfile(null));
+        void fetchProfileForUserId(currentUser.id);
       } else {
         setProfile(null);
       }
@@ -120,7 +138,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [fetchProfileForUserId]);
 
   const signOut = async () => {
     const key = readStoredAuthFromLocalStorage().storageKey ?? undefined;
@@ -143,7 +161,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signOut }}>
+    <AuthContext.Provider value={{ user, profile, loading, signOut, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
