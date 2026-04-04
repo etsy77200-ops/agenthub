@@ -16,6 +16,12 @@ export default function Navbar() {
     router.refresh();
   };
 
+  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL?.toLowerCase().trim();
+  const showAdmin =
+    Boolean(user) &&
+    (profile?.is_admin === true ||
+      Boolean(adminEmail && user?.email?.toLowerCase().trim() === adminEmail));
+
   return (
     <nav className="border-b border-border bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -47,6 +53,14 @@ export default function Navbar() {
                 >
                   Dashboard
                 </Link>
+                {showAdmin && (
+                  <Link
+                    href="/admin"
+                    className="px-4 py-2 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
+                  >
+                    Admin
+                  </Link>
+                )}
                 <div className="flex items-center gap-2">
                   <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
                     <span className="text-sm font-medium text-primary">
@@ -106,6 +120,11 @@ export default function Navbar() {
                 <Link href="/dashboard" className="block px-3 py-2 text-muted hover:text-foreground">
                   Dashboard
                 </Link>
+                {showAdmin && (
+                  <Link href="/admin" className="block px-3 py-2 text-primary font-medium">
+                    Admin
+                  </Link>
+                )}
                 <button onClick={handleSignOut} className="block px-3 py-2 text-red-600">
                   Sign out
                 </button>

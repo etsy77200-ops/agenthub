@@ -13,6 +13,8 @@ interface Profile {
   bio?: string;
   role: "buyer" | "seller" | "both";
   stripe_account_id?: string;
+  /** Set in Supabase (see supabase-admin-secure.sql) — used for Admin nav link */
+  is_admin?: boolean;
 }
 
 interface AuthContextType {
