@@ -7,7 +7,6 @@ import { getStoredAccessToken } from "@/lib/supabase-rest";
 export default function StripeConnectButton() {
   const { profile, user, refreshProfile } = useAuth();
   const [loadingConnect, setLoadingConnect] = useState(false);
-  const [loadingExpress, setLoadingExpress] = useState(false);
   /** Server-backed link state — profile from REST is often null even when Supabase has stripe_account_id. */
   const [apiConnected, setApiConnected] = useState<boolean | null>(null);
 
@@ -70,45 +69,42 @@ export default function StripeConnectButton() {
       alert(data.error || "Failed to reach Stripe");
       return null;
     }
-    if (data.url) return data.url;
+    const url = typeof data.url === "string" ? data.url.trim() : "";
+    if (url && /^https:\/\//i.test(url)) return url;
     alert(data.error || "No Stripe URL returned");
     return null;
   }, []);
 
-  const openStripeInNewTab = async (afterOpen: () => Promise<string | null>) => {
-    const w = window.open("about:blank", "_blank", "noopener,noreferrer");
-    if (!w) {
-      alert("Please allow pop-ups for this site so Stripe can open in a new tab.");
+  /**
+   * Fetch the Stripe URL first, then open it directly. Opening about:blank and assigning later
+   * often leaves a permanent blank tab (browser security). If the pop-up is blocked after
+   * the async call, we open in this tab instead (user can go back to AgentHub).
+   */
+  const openStripeFromApi = async (getUrl: () => Promise<string | null>) => {
+    let url: string | null;
+    try {
+      url = await getUrl();
+    } catch {
+      alert("Something went wrong");
       return;
     }
-    try {
-      const url = await afterOpen();
-      if (url) {
-        w.location.href = url;
-      } else {
-        w.close();
-      }
-    } catch {
-      w.close();
-      alert("Something went wrong");
-    }
+    if (!url) return;
+
+    const tab = window.open(url, "_blank", "noopener,noreferrer");
+    if (tab) return;
+
+    const useSameTab = window.confirm(
+      "Your browser blocked the new tab. Open Stripe in this tab instead? You can use the back button to return to AgentHub."
+    );
+    if (useSameTab) window.location.assign(url);
   };
 
   const handleConnect = async () => {
     setLoadingConnect(true);
     try {
-      await openStripeInNewTab(requestStripePortalUrl);
+      await openStripeFromApi(requestStripePortalUrl);
     } finally {
       setLoadingConnect(false);
-    }
-  };
-
-  const handleOpenExpress = async () => {
-    setLoadingExpress(true);
-    try {
-      await openStripeInNewTab(requestStripePortalUrl);
-    } finally {
-      setLoadingExpress(false);
     }
   };
 
@@ -129,14 +125,14 @@ export default function StripeConnectButton() {
             </svg>
             Stripe connected
           </div>
-          <button
-            type="button"
-            onClick={handleOpenExpress}
-            disabled={loadingExpress}
-            className="px-5 py-2.5 rounded-lg font-medium border border-indigo-200 text-indigo-800 bg-white hover:bg-indigo-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          <a
+            href="/api/stripe/express-login"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg font-medium border border-indigo-200 text-indigo-800 bg-white hover:bg-indigo-50 transition-colors"
           >
-            {loadingExpress ? "Opening…" : "Open Stripe Express"}
-          </button>
+            Open Stripe Express
+          </a>
         </>
       ) : (
         <button

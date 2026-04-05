@@ -23,9 +23,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Profile not found" }, { status: 404 });
     }
 
-    // If seller already has a Stripe account, create a new login link
-    if (profile.stripe_account_id) {
-      const loginLink = await stripe.accounts.createLoginLink(profile.stripe_account_id);
+    const accountId = String(profile.stripe_account_id ?? "").trim();
+    // If seller already has a Stripe account, create a new login link (Express dashboard)
+    if (accountId) {
+      const loginLink = await stripe.accounts.createLoginLink(accountId);
       return NextResponse.json({ url: loginLink.url });
     }
 
