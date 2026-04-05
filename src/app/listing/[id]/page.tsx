@@ -10,6 +10,10 @@ import { getStoredAccessToken } from "@/lib/supabase-rest";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
+/** Never includes agent_access_url — buyers get that only via /api after payment. */
+const LISTING_PUBLIC_SELECT =
+  "id, title, short_description, description, price, price_type, tags, rating, review_count, order_count, demo_url, status, created_at, seller:profiles!listings_seller_id_fkey(id, name, bio, created_at), category:categories(name, slug)";
+
 type PayoutTrustState =
   | { kind: "idle" }
   | { kind: "loading" }
@@ -53,12 +57,21 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
   const [ordering, setOrdering] = useState(false);
   const [requirements, setRequirements] = useState("");
   const [showOrderForm, setShowOrderForm] = useState(false);
+  type BuyerAccessState =
+    | { kind: "idle" }
+    | { kind: "loading" }
+    | { kind: "guest" }
+    | { kind: "none" }
+    | { kind: "pending_payment" }
+    | { kind: "unlocked"; url: string }
+    | { kind: "paid_missing_url" };
+  const [buyerAccess, setBuyerAccess] = useState<BuyerAccessState>({ kind: "idle" });
 
   useEffect(() => {
     const fetchListing = async () => {
       const { data } = await supabase
         .from("listings")
-        .select("*, seller:profiles!listings_seller_id_fkey(id, name, bio, created_at), category:categories(name, slug)")
+        .select(LISTING_PUBLIC_SELECT)
         .eq("id", id)
         .single();
 
@@ -97,6 +110,46 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
     };
     fetchListing();
   }, [id, supabase]);
+
+  useEffect(() => {
+    if (!listing || !user) {
+      setBuyerAccess(listing && !user ? { kind: "guest" } : { kind: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setBuyerAccess({ kind: "loading" });
+    (async () => {
+      try {
+        const headers: HeadersInit = { Accept: "application/json" };
+        const t = getStoredAccessToken();
+        if (t) headers.Authorization = `Bearer ${t}`;
+        const res = await fetch(`/api/listings/${listing.id}/buyer-access`, {
+          credentials: "include",
+          headers,
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          unlocked?: boolean;
+          reason?: string;
+          agent_access_url?: string;
+        };
+        if (cancelled) return;
+        if (data.unlocked && data.agent_access_url) {
+          setBuyerAccess({ kind: "unlocked", url: data.agent_access_url });
+        } else if (data.reason === "pending_payment") {
+          setBuyerAccess({ kind: "pending_payment" });
+        } else if (data.reason === "missing_url") {
+          setBuyerAccess({ kind: "paid_missing_url" });
+        } else {
+          setBuyerAccess({ kind: "none" });
+        }
+      } catch {
+        if (!cancelled) setBuyerAccess({ kind: "none" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listing, user]);
 
   const handleOrder = async () => {
     if (!user) {
@@ -169,6 +222,49 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           </div>
 
           <h1 className="text-3xl font-bold mb-4">{listing.title}</h1>
+
+          {buyerAccess.kind === "unlocked" && (
+            <div className="mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium text-green-900">You own this agent</p>
+                <p className="text-xs text-green-800/90">
+                  Open your production access link. You can also find it anytime under{" "}
+                  <Link href="/dashboard/purchases" className="underline font-medium">
+                    My purchases
+                  </Link>
+                  .
+                </p>
+              </div>
+              <a
+                href={buyerAccess.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-green-700 text-white text-sm font-medium hover:bg-green-800 shrink-0"
+              >
+                Open your agent
+              </a>
+            </div>
+          )}
+
+          {user && buyerAccess.kind === "pending_payment" && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Payment processing — your access link will unlock shortly. Check{" "}
+              <Link href="/dashboard/purchases" className="underline font-medium">
+                My purchases
+              </Link>{" "}
+              in a moment.
+            </div>
+          )}
+
+          {user && buyerAccess.kind === "paid_missing_url" && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Your payment went through, but this listing has no access URL on file. Please{" "}
+              <Link href="/contact" className="underline font-medium">
+                contact support
+              </Link>
+              .
+            </div>
+          )}
 
           {listing.demo_url ? (
             <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

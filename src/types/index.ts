@@ -30,6 +30,8 @@ export interface Listing {
   tags: string[];
   images: string[];
   demo_url?: string;
+  /** Production access URL; never expose in public listing queries — buyers get it after payment. */
+  agent_access_url?: string;
   status: "active" | "paused" | "draft";
   rating: number;
   review_count: number;

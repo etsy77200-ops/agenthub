@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseDemoUrl } from "@/lib/demo-url";
+import {
+  agentAccessUrlErrorMessage,
+  parseAgentAccessUrl,
+  parseDemoUrl,
+} from "@/lib/demo-url";
 import { getConnectPayoutFlags } from "@/lib/stripe-connect-payout";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 
@@ -64,12 +68,26 @@ export async function POST(req: NextRequest) {
     }
 
     const demoParsed = parseDemoUrl(String(body.demo_url ?? ""));
+    const agentAccessRaw = String(body.agent_access_url ?? "").trim();
+    const agentAccessParsed = parseAgentAccessUrl(String(body.agent_access_url ?? ""));
+    if (agentAccessRaw && !agentAccessParsed) {
+      return NextResponse.json({ error: agentAccessUrlErrorMessage() }, { status: 400 });
+    }
     if (status === "active") {
       if (!demoParsed) {
         return NextResponse.json(
           {
             error:
               "A valid https demo URL is required to publish. Buyers must be able to open a preview before paying.",
+          },
+          { status: 400 }
+        );
+      }
+      if (!agentAccessParsed) {
+        return NextResponse.json(
+          {
+            error:
+              "A valid https agent access URL is required to publish. This is the link buyers receive after they pay (production app, portal, or invite).",
           },
           { status: 400 }
         );
@@ -105,6 +123,7 @@ export async function POST(req: NextRequest) {
         price_type,
         tags,
         demo_url: demoParsed,
+        agent_access_url: agentAccessParsed,
         status,
       })
       .select("id")

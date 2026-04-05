@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
-import { demoUrlErrorMessage, parseDemoUrl } from "@/lib/demo-url";
+import {
+  agentAccessUrlErrorMessage,
+  demoUrlErrorMessage,
+  parseAgentAccessUrl,
+  parseDemoUrl,
+} from "@/lib/demo-url";
 import { getStoredAccessToken } from "@/lib/supabase-rest";
 
 interface Category {
@@ -23,6 +28,7 @@ export default function CreateListingPage() {
   const [priceType, setPriceType] = useState("fixed");
   const [tags, setTags] = useState("");
   const [demoUrl, setDemoUrl] = useState("");
+  const [agentAccessUrl, setAgentAccessUrl] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,6 +94,7 @@ export default function CreateListingPage() {
     setLoading(true);
 
     const demoParsed = parseDemoUrl(demoUrl);
+    const agentParsed = parseAgentAccessUrl(agentAccessUrl);
     if (status === "active") {
       if (!demoParsed) {
         setError(
@@ -96,6 +103,18 @@ export default function CreateListingPage() {
         setLoading(false);
         return;
       }
+      if (!agentParsed) {
+        setError(
+          "An agent access URL (https) is required to publish. This is the link buyers get after they pay — your live app, API portal, or invite URL."
+        );
+        setLoading(false);
+        return;
+      }
+    }
+    if (agentAccessUrl.trim() && !agentParsed) {
+      setError(agentAccessUrlErrorMessage());
+      setLoading(false);
+      return;
     }
 
     const res = await fetch("/api/listings", {
@@ -110,6 +129,7 @@ export default function CreateListingPage() {
         price_type: priceType,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         demo_url: demoUrl,
+        agent_access_url: agentAccessUrl,
         status,
       }),
     });
@@ -278,6 +298,25 @@ export default function CreateListingPage() {
           </p>
           {demoUrl.trim() && !parseDemoUrl(demoUrl) && (
             <p className="text-xs text-amber-700 mt-1">{demoUrlErrorMessage()}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1.5">Agent access URL {`(required to publish)`}</label>
+          <input
+            type="url"
+            value={agentAccessUrl}
+            onChange={(e) => setAgentAccessUrl(e.target.value)}
+            placeholder="https://app.youragent.com/... or https://platform.openai.com/..."
+            className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+          <p className="text-xs text-muted mt-1">
+            <strong className="font-medium text-foreground">https</strong> only. Buyers never see this on the listing
+            page — it unlocks on <strong className="font-medium text-foreground">My purchases</strong> after payment
+            succeeds. Use your production app link, hosted agent UI, or a sign-up / invite URL.
+          </p>
+          {agentAccessUrl.trim() && !parseAgentAccessUrl(agentAccessUrl) && (
+            <p className="text-xs text-amber-700 mt-1">{agentAccessUrlErrorMessage()}</p>
           )}
         </div>
 

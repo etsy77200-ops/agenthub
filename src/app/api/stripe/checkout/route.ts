@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseAgentAccessUrl } from "@/lib/demo-url";
 import { getConnectPayoutFlags } from "@/lib/stripe-connect-payout";
 import { stripe, PLATFORM_FEE_PERCENT } from "@/lib/stripe";
 import { getSupabaseUserFromRequest } from "@/lib/supabase-route-user";
@@ -38,6 +39,17 @@ export async function POST(req: NextRequest) {
     if (listing.status === "active" && !demo) {
       return NextResponse.json(
         { error: "This listing does not include a demo URL and cannot be purchased." },
+        { status: 400 }
+      );
+    }
+
+    const agentAccess = parseAgentAccessUrl(String((listing as any).agent_access_url ?? ""));
+    if (listing.status === "active" && !agentAccess) {
+      return NextResponse.json(
+        {
+          error:
+            "This listing is missing a valid agent access URL. The seller must add an https link buyers receive after purchase.",
+        },
         { status: 400 }
       );
     }
@@ -89,7 +101,7 @@ export async function POST(req: NextRequest) {
         requirements: requirements || "",
         platform_fee: platformFee.toString(),
       },
-      success_url: `${req.nextUrl.origin}/dashboard/orders?success=true`,
+      success_url: `${req.nextUrl.origin}/dashboard/purchases?checkout=success`,
       cancel_url: `${req.nextUrl.origin}/listing/${listing.id}?cancelled=true`,
     };
 
