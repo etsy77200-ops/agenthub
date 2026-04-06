@@ -275,6 +275,15 @@ export default function Home() {
       <section id="hero" className="home-section relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-accent/5 py-20 lg:py-28">
         <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary/15 blur-2xl animate-pulse-soft" />
         <div className="pointer-events-none absolute top-12 right-0 h-32 w-32 rounded-full bg-accent/15 blur-2xl animate-float-slow" />
+        <div className="hero-floating-layer pointer-events-none">
+          <div className="hero-float-card hero-float-1">Auto billing</div>
+          <div className="hero-float-card hero-float-2">Live messaging</div>
+          <div className="hero-float-card hero-float-3">Verified reviews</div>
+          <div className="hero-particle hero-particle-1" />
+          <div className="hero-particle hero-particle-2" />
+          <div className="hero-particle hero-particle-3" />
+          <div className="hero-particle hero-particle-4" />
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <Reveal delayMs={20}>
             <div className="inline-block px-4 py-1.5 bg-primary/10 text-primary text-sm font-medium rounded-full mb-6">
