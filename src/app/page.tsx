@@ -216,6 +216,27 @@ export default function Home() {
       badge: "Audit trail",
     },
   ];
+  const integrations = ["Supabase", "Stripe", "Vercel", "Resend", "Next.js", "Postgres"];
+  const socialProof = [
+    {
+      quote:
+        "We launched two new AI offers in one month. The billing and access controls just worked.",
+      name: "Mina K.",
+      role: "Founder, PromptOps Studio",
+    },
+    {
+      quote:
+        "The messaging and verified review flow increased buyer trust without adding manual overhead.",
+      name: "Arjun P.",
+      role: "Marketplace Lead, AgentForge",
+    },
+    {
+      quote:
+        "Revision history saved us during a listing update mistake. We could quickly compare and recover details.",
+      name: "Selena R.",
+      role: "Growth Engineer, Buildwise AI",
+    },
+  ];
 
   useEffect(() => {
     const elements = sectionNav
@@ -243,7 +264,13 @@ export default function Home() {
   }, []);
 
   return (
-    <div>
+    <div className="relative">
+      <div className="site-ambient-bg" aria-hidden="true">
+        <div className="ambient-orb ambient-orb-a" />
+        <div className="ambient-orb ambient-orb-b" />
+        <div className="ambient-orb ambient-orb-c" />
+        <div className="ambient-grid" />
+      </div>
       {/* Hero */}
       <section id="hero" className="home-section relative overflow-hidden bg-gradient-to-br from-primary/5 via-white to-accent/5 py-20 lg:py-28">
         <div className="pointer-events-none absolute -top-10 -left-10 h-40 w-40 rounded-full bg-primary/15 blur-2xl animate-pulse-soft" />
@@ -300,6 +327,25 @@ export default function Home() {
               <div className="text-3xl font-bold text-foreground">4.7/5</div>
               <div className="text-sm text-muted">Avg Rating</div>
             </Reveal>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-10 bg-white/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Reveal>
+            <p className="text-center text-xs uppercase tracking-[0.2em] text-muted mb-5">
+              Trusted stack
+            </p>
+          </Reveal>
+          <div className="integrations-marquee">
+            <div className="integrations-track">
+              {[...integrations, ...integrations].map((item, idx) => (
+                <div key={`${item}-${idx}`} className="integration-pill">
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -528,6 +574,43 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="home-section py-16 bg-secondary/40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Reveal>
+            <h2 className="text-3xl font-bold text-center mb-3">Before vs After AgentHub</h2>
+          </Reveal>
+          <Reveal delayMs={90}>
+            <p className="text-muted text-center mb-10 max-w-2xl mx-auto">
+              Move from fragmented operations to a single conversion-optimized marketplace flow.
+            </p>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <Reveal>
+              <div className="premium-card rounded-2xl border border-border bg-white p-6 h-full">
+                <div className="text-sm font-semibold text-red-600 mb-3">Before</div>
+                <ul className="space-y-2 text-sm text-muted">
+                  <li>Multiple tools for checkout, messaging, and fulfillment</li>
+                  <li>Manual subscription follow-ups and access cleanups</li>
+                  <li>Low trust due to weak social proof controls</li>
+                  <li>Listing changes without version visibility</li>
+                </ul>
+              </div>
+            </Reveal>
+            <Reveal delayMs={120}>
+              <div className="premium-card rounded-2xl border border-primary/30 bg-white p-6 h-full">
+                <div className="text-sm font-semibold text-green-600 mb-3">After</div>
+                <ul className="space-y-2 text-sm text-muted">
+                  <li>Unified browse, checkout, messaging, and seller workflow</li>
+                  <li>Automated webhooks for billing lifecycle and access gating</li>
+                  <li>Verified-purchase reviews + admin moderation controls</li>
+                  <li>Revision snapshots and history for safer listing iteration</li>
+                </ul>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
       {/* How it Works */}
       <section id="how-it-works" className="home-section py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -612,6 +695,30 @@ export default function Home() {
                 <div className="rounded-xl border border-border bg-white px-4 py-3 text-sm text-muted premium-card">
                   <span className="text-primary mr-2">✓</span>
                   {item}
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Reveal>
+            <h2 className="text-3xl font-bold text-center mb-3">What teams say</h2>
+          </Reveal>
+          <Reveal delayMs={80}>
+            <p className="text-muted text-center mb-10">Proof from teams shipping AI products on AgentHub.</p>
+          </Reveal>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {socialProof.map((item, idx) => (
+              <Reveal key={item.name} delayMs={idx * 90}>
+                <div className="premium-card rounded-2xl border border-border p-5 bg-white h-full">
+                  <p className="text-sm text-foreground leading-relaxed">&ldquo;{item.quote}&rdquo;</p>
+                  <div className="mt-5 pt-4 border-t border-border/70">
+                    <div className="text-sm font-semibold">{item.name}</div>
+                    <div className="text-xs text-muted">{item.role}</div>
+                  </div>
                 </div>
               </Reveal>
             ))}
