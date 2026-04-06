@@ -64,6 +64,7 @@ export default function Navbar() {
     "after:absolute after:left-3 after:right-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary after:scale-x-0 after:origin-left after:transition-transform after:duration-300 hover:after:scale-x-100";
   const isActive = (href: string) =>
     href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const topNavLink = `${navLinkBase} ${navUnderline}`;
 
   return (
     <nav className="border-b border-border bg-white sticky top-0 z-50">
@@ -77,10 +78,16 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden md:flex items-center gap-8">
-            <Link href="/browse" className="text-muted hover:text-foreground transition-colors">
+            <Link
+              href="/browse"
+              className={`${topNavLink} ${isActive("/browse") ? navLinkActive : ""}`}
+            >
               Browse Agents
             </Link>
-            <Link href="/dashboard/create-listing" className="text-muted hover:text-foreground transition-colors">
+            <Link
+              href="/dashboard/create-listing"
+              className={`${topNavLink} ${isActive("/dashboard/create-listing") ? navLinkActive : ""}`}
+            >
               Sell Your Agent
             </Link>
           </div>
@@ -92,19 +99,19 @@ export default function Navbar() {
               <>
                 <Link
                   href="/dashboard"
-                  className={`${navLinkBase} ${navUnderline} ${isActive("/dashboard") ? navLinkActive : ""}`}
+                  className={`${topNavLink} ${isActive("/dashboard") ? navLinkActive : ""}`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   href="/dashboard/purchases"
-                  className={`${navLinkBase} ${navUnderline} ${isActive("/dashboard/purchases") ? navLinkActive : ""}`}
+                  className={`${topNavLink} ${isActive("/dashboard/purchases") ? navLinkActive : ""}`}
                 >
                   My purchases
                 </Link>
                 <Link
                   href="/dashboard/messages"
-                  className={`${navLinkBase} ${navUnderline} inline-flex items-center gap-2 ${isActive("/dashboard/messages") ? navLinkActive : ""}`}
+                  className={`${topNavLink} inline-flex items-center gap-2 ${isActive("/dashboard/messages") ? navLinkActive : ""}`}
                 >
                   <span>Messages</span>
                   {unreadCount > 0 && (
@@ -116,7 +123,7 @@ export default function Navbar() {
                 {showAdmin && (
                   <Link
                     href="/admin"
-                    className={`${navLinkBase} ${navUnderline} font-medium ${isActive("/admin") ? navLinkActive : "text-primary hover:text-primary-dark"}`}
+                    className={`${topNavLink} font-medium ${isActive("/admin") ? navLinkActive : "text-primary hover:text-primary-dark"}`}
                   >
                     Admin
                   </Link>
@@ -139,7 +146,7 @@ export default function Navbar() {
               <>
                 <Link
                   href="/auth/login"
-                  className={`${navLinkBase} ${navUnderline} ${isActive("/auth/login") ? navLinkActive : ""}`}
+                  className={`${topNavLink} ${isActive("/auth/login") ? navLinkActive : ""}`}
                 >
                   Log in
                 </Link>
@@ -154,7 +161,7 @@ export default function Navbar() {
           </div>
 
           <button
-            className="md:hidden p-2"
+            className="md:hidden p-2 rounded-lg transition-all duration-200 hover:bg-primary/10 hover:-translate-y-0.5"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,21 +176,36 @@ export default function Navbar() {
 
         {mobileOpen && (
           <div className="md:hidden pb-4 space-y-2">
-            <Link href="/browse" className="block px-3 py-2 text-muted hover:text-foreground">
+            <Link
+              href="/browse"
+              className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/browse") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+            >
               Browse Agents
             </Link>
-            <Link href="/dashboard/create-listing" className="block px-3 py-2 text-muted hover:text-foreground">
+            <Link
+              href="/dashboard/create-listing"
+              className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/dashboard/create-listing") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+            >
               Sell Your Agent
             </Link>
             {user ? (
               <>
-                <Link href="/dashboard" className="block px-3 py-2 text-muted hover:text-foreground">
+                <Link
+                  href="/dashboard"
+                  className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/dashboard") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+                >
                   Dashboard
                 </Link>
-                <Link href="/dashboard/purchases" className="block px-3 py-2 text-muted hover:text-foreground">
+                <Link
+                  href="/dashboard/purchases"
+                  className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/dashboard/purchases") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+                >
                   My purchases
                 </Link>
-                <Link href="/dashboard/messages" className="block px-3 py-2 text-muted hover:text-foreground">
+                <Link
+                  href="/dashboard/messages"
+                  className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/dashboard/messages") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+                >
                   <span className="inline-flex items-center gap-2">
                     <span>Messages</span>
                     {unreadCount > 0 && (
@@ -194,7 +216,10 @@ export default function Navbar() {
                   </span>
                 </Link>
                 {showAdmin && (
-                  <Link href="/admin" className="block px-3 py-2 text-primary font-medium">
+                  <Link
+                    href="/admin"
+                    className={`block px-3 py-2 rounded-lg font-medium transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/admin") ? "bg-primary/10 text-primary" : "text-primary"}`}
+                  >
                     Admin
                   </Link>
                 )}
@@ -204,10 +229,16 @@ export default function Navbar() {
               </>
             ) : (
               <>
-                <Link href="/auth/login" className="block px-3 py-2 text-muted hover:text-foreground">
+                <Link
+                  href="/auth/login"
+                  className={`block px-3 py-2 rounded-lg transition-all duration-200 hover:bg-primary/5 hover:-translate-y-0.5 ${isActive("/auth/login") ? "bg-primary/10 text-primary" : "text-muted hover:text-foreground"}`}
+                >
                   Log in
                 </Link>
-                <Link href="/auth/signup" className="block px-3 py-2 text-primary font-medium">
+                <Link
+                  href="/auth/signup"
+                  className="block px-3 py-2 rounded-lg text-primary font-medium transition-all duration-200 hover:bg-primary/10 hover:-translate-y-0.5"
+                >
                   Sign up
                 </Link>
               </>
