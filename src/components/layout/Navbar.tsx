@@ -53,6 +53,9 @@ export default function Navbar() {
     };
   }, [user?.id]);
 
+  const unreadLabel =
+    unreadCount > 99 ? "99+" : unreadCount > 0 ? String(unreadCount) : "";
+
   return (
     <nav className="border-b border-border bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -92,9 +95,14 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/dashboard/messages"
-                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors inline-flex items-center gap-2"
                 >
-                  Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                  <span>Messages</span>
+                  {unreadCount > 0 && (
+                    <span className="inline-flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
+                      {unreadLabel}
+                    </span>
+                  )}
                 </Link>
                 {showAdmin && (
                   <Link
@@ -167,7 +175,14 @@ export default function Navbar() {
                   My purchases
                 </Link>
                 <Link href="/dashboard/messages" className="block px-3 py-2 text-muted hover:text-foreground">
-                  Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}
+                  <span className="inline-flex items-center gap-2">
+                    <span>Messages</span>
+                    {unreadCount > 0 && (
+                      <span className="inline-flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
+                        {unreadLabel}
+                      </span>
+                    )}
+                  </span>
                 </Link>
                 {showAdmin && (
                   <Link href="/admin" className="block px-3 py-2 text-primary font-medium">

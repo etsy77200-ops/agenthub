@@ -27,6 +27,12 @@ type Listing = {
   status: "active" | "draft" | "paused";
 };
 
+type ListingRevision = {
+  id: string;
+  created_at: string;
+  snapshot: Partial<Listing> | null;
+};
+
 export default function EditListingPage({
   params,
 }: {
@@ -42,6 +48,7 @@ export default function EditListingPage({
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState<Listing | null>(null);
+  const [revisions, setRevisions] = useState<ListingRevision[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -52,9 +59,15 @@ export default function EditListingPage({
     let cancelled = false;
     (async () => {
       try {
-        const [{ data: listing }, { data: cats }] = await Promise.all([
+        const [{ data: listing }, { data: cats }, { data: revs }] = await Promise.all([
           supabase.from("listings").select("*").eq("id", id).single(),
           supabase.from("categories").select("id,name").order("name"),
+          supabase
+            .from("listing_revisions")
+            .select("id,created_at,snapshot")
+            .eq("listing_id", id)
+            .order("created_at", { ascending: false })
+            .limit(10),
         ]);
         if (cancelled) return;
         if (!listing || listing.seller_id !== user.id) {
@@ -68,6 +81,7 @@ export default function EditListingPage({
           tags: Array.isArray(listing.tags) ? listing.tags : [],
         } as Listing);
         setCategories((cats ?? []) as Category[]);
+        setRevisions(((revs ?? []) as ListingRevision[]).filter((x) => Boolean(x.created_at)));
       } catch {
         if (!cancelled) setError("Failed to load listing.");
       } finally {
@@ -132,6 +146,37 @@ export default function EditListingPage({
         <Link href="/dashboard" className="text-sm text-primary hover:underline">Back to dashboard</Link>
       </div>
       {error && <div className="p-3 rounded-lg border border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>}
+
+      <section className="border border-border rounded-xl p-4 bg-white">
+        <h2 className="text-base font-semibold">Revision history</h2>
+        <p className="text-sm text-muted mt-1">Snapshots are saved automatically each time you update this listing.</p>
+        {revisions.length === 0 ? (
+          <p className="text-sm text-muted mt-3">No saved revisions yet.</p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {revisions.map((rev) => {
+              const snapshot = rev.snapshot ?? {};
+              return (
+                <details key={rev.id} className="rounded-lg border border-border bg-secondary/20">
+                  <summary className="cursor-pointer list-none p-3 flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium">
+                      {new Date(rev.created_at).toLocaleString()}
+                    </span>
+                    <span className="text-xs text-muted">Click to view snapshot</span>
+                  </summary>
+                  <div className="px-3 pb-3 text-sm text-muted space-y-1">
+                    <div><span className="font-medium text-foreground">Title:</span> {snapshot.title ?? "—"}</div>
+                    <div><span className="font-medium text-foreground">Status:</span> {snapshot.status ?? "—"}</div>
+                    <div><span className="font-medium text-foreground">Billing:</span> {snapshot.billing_type ?? "one_time"}</div>
+                    <div><span className="font-medium text-foreground">One-time price:</span> {snapshot.price ?? "—"}</div>
+                    <div><span className="font-medium text-foreground">Monthly price:</span> {snapshot.monthly_price ?? "—"}</div>
+                  </div>
+                </details>
+              );
+            })}
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">

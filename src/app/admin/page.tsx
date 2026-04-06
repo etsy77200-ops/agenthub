@@ -33,6 +33,16 @@ interface ListingRow {
   created_at: string;
 }
 
+interface ReviewRow {
+  id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  verified_purchase: boolean;
+  listing: { title: string } | null;
+  reviewer: { name: string | null; email: string | null } | null;
+}
+
 /**
  * Route access: middleware + ADMIN_EMAIL + Supabase cookies.
  * Data: GET /api/admin/data (same checks + RLS is_admin — see supabase-admin-secure.sql).
@@ -42,15 +52,19 @@ export default function AdminPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [listings, setListings] = useState<ListingRow[]>([]);
+  const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "users" | "orders" | "listings">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "users" | "orders" | "listings" | "reviews">("overview");
   const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
     if (fetched) return;
 
     const load = async () => {
-      const res = await fetch("/api/admin/data", { credentials: "same-origin" });
+      const [res, reviewsRes] = await Promise.all([
+        fetch("/api/admin/data", { credentials: "same-origin" }),
+        fetch("/api/admin/reviews", { credentials: "same-origin" }),
+      ]);
       if (!res.ok) {
         router.replace("/");
         setLoading(false);
@@ -64,6 +78,12 @@ export default function AdminPage() {
       setUsers(data.users ?? []);
       setOrders(data.orders ?? []);
       setListings(data.listings ?? []);
+      if (reviewsRes.ok) {
+        const reviewsData = (await reviewsRes.json()) as { reviews?: ReviewRow[] };
+        setReviews(reviewsData.reviews ?? []);
+      } else {
+        setReviews([]);
+      }
       setLoading(false);
       setFetched(true);
     };
@@ -107,6 +127,20 @@ export default function AdminPage() {
     both: "bg-indigo-100 text-indigo-800",
   };
 
+  const removeReview = async (reviewId: string) => {
+    const ok = window.confirm("Delete this review? This cannot be undone.");
+    if (!ok) return;
+    const res = await fetch(`/api/admin/reviews/${reviewId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      window.alert("Failed to delete review.");
+      return;
+    }
+    setReviews((prev) => prev.filter((r) => r.id !== reviewId));
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
@@ -115,7 +149,7 @@ export default function AdminPage() {
       </div>
 
       <div className="flex gap-2 mb-8 border-b border-border">
-        {(["overview", "users", "orders", "listings"] as const).map((tab) => (
+        {(["overview", "users", "orders", "listings", "reviews"] as const).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -324,6 +358,55 @@ export default function AdminPage() {
                 ))}
                 {listings.length === 0 && (
                   <tr><td colSpan={5} className="px-4 py-8 text-center text-muted">No listings yet</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {activeTab === "reviews" && (
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Review Moderation ({reviews.length})</h2>
+          <div className="border border-border rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead className="bg-secondary">
+                <tr>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted">Listing</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted hidden sm:table-cell">Reviewer</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted">Rating</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted hidden lg:table-cell">Comment</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted hidden md:table-cell">Date</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-muted">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {reviews.map((r) => (
+                  <tr key={r.id} className="hover:bg-card-hover align-top">
+                    <td className="px-4 py-3 text-sm font-medium">{r.listing?.title ?? "Unknown listing"}</td>
+                    <td className="px-4 py-3 text-sm text-muted hidden sm:table-cell">
+                      {r.reviewer?.name || r.reviewer?.email || "Unknown user"}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{r.rating}/5</td>
+                    <td className="px-4 py-3 text-sm text-muted hidden lg:table-cell max-w-sm">
+                      <div className="line-clamp-3">{r.comment}</div>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-muted hidden md:table-cell">{new Date(r.created_at).toLocaleDateString()}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void removeReview(r.id);
+                        }}
+                        className="text-red-600 hover:text-red-700 font-medium"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {reviews.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted">No reviews yet</td></tr>
                 )}
               </tbody>
             </table>
