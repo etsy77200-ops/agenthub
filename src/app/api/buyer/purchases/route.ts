@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
         listing_id,
         status,
         purchase_type,
+        stripe_subscription_id,
         stripe_subscription_status,
         created_at,
         amount,
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
       listing_id: string;
       status: string;
       purchase_type?: string | null;
+      stripe_subscription_id?: string | null;
       stripe_subscription_status?: string | null;
       created_at: string;
       amount: number;
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest) {
         listing_title: title,
         status: r.status,
         purchase_type: purchaseType,
+        stripe_subscription_id: String(r.stripe_subscription_id ?? "").trim() || null,
         stripe_subscription_status: subStatus || null,
         created_at: r.created_at,
         amount: r.amount,

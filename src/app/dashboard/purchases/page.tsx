@@ -12,6 +12,7 @@ type PurchaseRow = {
   listing_title: string;
   status: string;
   purchase_type: "one_time" | "monthly";
+  stripe_subscription_id: string | null;
   stripe_subscription_status: string | null;
   created_at: string;
   amount: number;
@@ -176,6 +177,18 @@ function PurchasesContent() {
                     </a>
                   </div>
                 )}
+                {!p.payment_pending &&
+                  p.purchase_type === "monthly" &&
+                  p.stripe_subscription_id && (
+                    <div className="mt-3">
+                      <a
+                        href={`/api/stripe/billing-portal?order_id=${encodeURIComponent(p.order_id)}`}
+                        className="inline-flex items-center justify-center px-4 py-2.5 rounded-lg border border-border bg-white text-sm font-medium hover:bg-secondary"
+                      >
+                        Manage subscription
+                      </a>
+                    </div>
+                  )}
                 {!p.payment_pending && p.access_pending && (
                   <p className="text-sm text-muted">
                     This listing has no access URL on file. Contact the seller or{" "}
