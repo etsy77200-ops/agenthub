@@ -26,6 +26,8 @@ export interface Listing {
   category_id: string;
   category?: Category;
   price: number;
+  monthly_price?: number | null;
+  billing_type?: "one_time" | "monthly" | "both";
   price_type: "fixed" | "hourly" | "custom";
   tags: string[];
   images: string[];

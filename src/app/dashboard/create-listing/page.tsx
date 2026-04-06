@@ -25,7 +25,9 @@ export default function CreateListingPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [monthlyPrice, setMonthlyPrice] = useState("");
   const [priceType, setPriceType] = useState("fixed");
+  const [billingType, setBillingType] = useState<"one_time" | "monthly" | "both">("one_time");
   const [tags, setTags] = useState("");
   const [demoUrl, setDemoUrl] = useState("");
   const [agentAccessUrl, setAgentAccessUrl] = useState("");
@@ -95,6 +97,20 @@ export default function CreateListingPage() {
 
     const demoParsed = parseDemoUrl(demoUrl);
     const agentParsed = parseAgentAccessUrl(agentAccessUrl);
+    const oneTimeValue = Number(price);
+    const monthlyValue = Number(monthlyPrice);
+    const needsOneTime = billingType === "one_time" || billingType === "both";
+    const needsMonthly = billingType === "monthly" || billingType === "both";
+    if (needsOneTime && (!Number.isFinite(oneTimeValue) || oneTimeValue <= 0)) {
+      setError("Add a valid one-time price greater than 0.");
+      setLoading(false);
+      return;
+    }
+    if (needsMonthly && (!Number.isFinite(monthlyValue) || monthlyValue <= 0)) {
+      setError("Add a valid monthly price greater than 0.");
+      setLoading(false);
+      return;
+    }
     if (status === "active") {
       if (!demoParsed) {
         setError(
@@ -125,8 +141,10 @@ export default function CreateListingPage() {
         short_description: shortDesc,
         description,
         category_id: category || null,
-        price: Number(price),
+        price: needsOneTime ? oneTimeValue : 0,
+        monthly_price: needsMonthly ? monthlyValue : null,
         price_type: priceType,
+        billing_type: billingType,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         demo_url: demoUrl,
         agent_access_url: agentAccessUrl,
@@ -252,24 +270,62 @@ export default function CreateListingPage() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1.5">Price (USD) *</label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
-            <input
-              type="number"
-              value={price}
-              onChange={(e) => setPrice(e.target.value)}
-              placeholder="499"
-              min="1"
-              className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              required
-            />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Billing model *</label>
+            <select
+              value={billingType}
+              onChange={(e) => setBillingType(e.target.value as "one_time" | "monthly" | "both")}
+              className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+            >
+              <option value="one_time">One-time only</option>
+              <option value="monthly">Monthly only</option>
+              <option value="both">Offer both</option>
+            </select>
           </div>
-          <p className="text-xs text-muted mt-1">
-            You&apos;ll receive 85% (${price ? (Number(price) * 0.85).toFixed(2) : "0.00"}). AgentHub takes a 15% platform fee.
-          </p>
         </div>
+
+        {(billingType === "one_time" || billingType === "both") && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">One-time price (USD) *</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="499"
+                min="1"
+                className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                required
+              />
+            </div>
+            <p className="text-xs text-muted mt-1">
+              Seller receives 85% (${price ? (Number(price) * 0.85).toFixed(2) : "0.00"}) per one-time purchase.
+            </p>
+          </div>
+        )}
+
+        {(billingType === "monthly" || billingType === "both") && (
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Monthly price (USD) *</label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">$</span>
+              <input
+                type="number"
+                value={monthlyPrice}
+                onChange={(e) => setMonthlyPrice(e.target.value)}
+                placeholder="49"
+                min="1"
+                className="w-full pl-8 pr-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                required
+              />
+            </div>
+            <p className="text-xs text-muted mt-1">
+              Seller receives 85% (${monthlyPrice ? (Number(monthlyPrice) * 0.85).toFixed(2) : "0.00"}) per monthly renewal.
+            </p>
+          </div>
+        )}
 
         <div>
           <label className="block text-sm font-medium mb-1.5">Tags</label>

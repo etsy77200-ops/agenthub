@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from "@/lib/supabase-server";
 
 const PRICE_TYPES = new Set(["fixed", "hourly", "custom"]);
 const STATUSES = new Set(["active", "draft"]);
+const BILLING_TYPES = new Set(["one_time", "monthly", "both"]);
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,7 +32,13 @@ export async function POST(req: NextRequest) {
         ? null
         : String(body.category_id);
     const price = Number(body.price);
+    const monthly_price_raw = body.monthly_price;
+    const monthly_price =
+      monthly_price_raw === null || monthly_price_raw === undefined || String(monthly_price_raw).trim() === ""
+        ? null
+        : Number(monthly_price_raw);
     const price_type = String(body.price_type ?? "fixed");
+    const billing_type = String(body.billing_type ?? "one_time");
     const status = body.status === "active" ? "active" : "draft";
 
     const tagsRaw = body.tags;
@@ -57,8 +64,22 @@ export async function POST(req: NextRequest) {
     if (!category_id) {
       return NextResponse.json({ error: "Category is required." }, { status: 400 });
     }
-    if (!Number.isFinite(price) || price <= 0) {
-      return NextResponse.json({ error: "Price must be a positive number." }, { status: 400 });
+    if (!BILLING_TYPES.has(billing_type)) {
+      return NextResponse.json({ error: "Invalid billing model." }, { status: 400 });
+    }
+    const needsOneTime = billing_type === "one_time" || billing_type === "both";
+    const needsMonthly = billing_type === "monthly" || billing_type === "both";
+    if (needsOneTime && (!Number.isFinite(price) || price <= 0)) {
+      return NextResponse.json({ error: "One-time price must be a positive number." }, { status: 400 });
+    }
+    if (!needsOneTime && !Number.isFinite(price)) {
+      return NextResponse.json({ error: "Invalid one-time price value." }, { status: 400 });
+    }
+    if (needsMonthly && (!Number.isFinite(monthly_price) || (monthly_price ?? 0) <= 0)) {
+      return NextResponse.json({ error: "Monthly price must be a positive number." }, { status: 400 });
+    }
+    if (!needsMonthly && monthly_price !== null && !Number.isFinite(monthly_price)) {
+      return NextResponse.json({ error: "Invalid monthly price value." }, { status: 400 });
     }
     if (!PRICE_TYPES.has(price_type)) {
       return NextResponse.json({ error: "Invalid pricing type." }, { status: 400 });
@@ -120,7 +141,9 @@ export async function POST(req: NextRequest) {
         description,
         category_id,
         price,
+        monthly_price: needsMonthly ? monthly_price : null,
         price_type,
+        billing_type,
         tags,
         demo_url: demoParsed,
         agent_access_url: agentAccessParsed,

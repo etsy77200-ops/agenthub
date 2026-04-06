@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     }
     const { user, supabase } = got;
 
-    const { listing_id, requirements } = await req.json();
+    const { listing_id, requirements, purchase_type } = await req.json();
 
     // Get listing details
     const { data: listing, error: listingError } = await supabase
@@ -73,14 +73,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const amountInCents = Math.round(listing.price * 100);
+    const billingType = String((listing as { billing_type?: string | null }).billing_type ?? "one_time");
+    const requestedPurchaseType = purchase_type === "monthly" ? "monthly" : "one_time";
+    const allowedOneTime = billingType === "one_time" || billingType === "both";
+    const allowedMonthly = billingType === "monthly" || billingType === "both";
+    if (requestedPurchaseType === "monthly" && !allowedMonthly) {
+      return NextResponse.json({ error: "This listing does not offer monthly billing." }, { status: 400 });
+    }
+    if (requestedPurchaseType === "one_time" && !allowedOneTime) {
+      return NextResponse.json({ error: "This listing does not offer one-time purchase." }, { status: 400 });
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const monthlyPrice = Number((listing as any).monthly_price ?? 0);
+    const selectedPrice = requestedPurchaseType === "monthly" ? monthlyPrice : Number(listing.price ?? 0);
+    if (!Number.isFinite(selectedPrice) || selectedPrice <= 0) {
+      return NextResponse.json(
+        { error: requestedPurchaseType === "monthly" ? "Monthly price is not configured." : "One-time price is not configured." },
+        { status: 400 }
+      );
+    }
+
+    const amountInCents = Math.round(selectedPrice * 100);
     const platformFee = Math.round(amountInCents * (PLATFORM_FEE_PERCENT / 100));
 
     // Create Stripe Checkout Session
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sessionParams: any = {
       payment_method_types: ["card"],
-      mode: "payment",
+      mode: requestedPurchaseType === "monthly" ? "subscription" : "payment",
       line_items: [
         {
           price_data: {
@@ -89,7 +110,12 @@ export async function POST(req: NextRequest) {
               name: listing.title,
               description: listing.short_description,
             },
-            unit_amount: amountInCents,
+            ...(requestedPurchaseType === "monthly"
+              ? {
+                  unit_amount: amountInCents,
+                  recurring: { interval: "month" as const },
+                }
+              : { unit_amount: amountInCents }),
           },
           quantity: 1,
         },
@@ -99,6 +125,7 @@ export async function POST(req: NextRequest) {
         buyer_id: user.id,
         seller_id: listing.seller_id,
         requirements: requirements || "",
+        purchase_type: requestedPurchaseType,
         platform_fee: platformFee.toString(),
       },
       success_url: `${req.nextUrl.origin}/dashboard/purchases?checkout=success`,
@@ -106,9 +133,17 @@ export async function POST(req: NextRequest) {
     };
 
     // Use normalized seller row — PostgREST may return seller as an array; listing.seller?.stripe_account_id would be wrong.
-    if (sellerStripeAccountId) {
+    if (sellerStripeAccountId && requestedPurchaseType === "one_time") {
       sessionParams.payment_intent_data = {
         application_fee_amount: platformFee,
+        transfer_data: {
+          destination: sellerStripeAccountId,
+        },
+      };
+    }
+    if (sellerStripeAccountId && requestedPurchaseType === "monthly") {
+      sessionParams.subscription_data = {
+        application_fee_percent: PLATFORM_FEE_PERCENT,
         transfer_data: {
           destination: sellerStripeAccountId,
         },
@@ -121,8 +156,8 @@ export async function POST(req: NextRequest) {
       buyer_id: user.id,
       listing_id: listing.id,
       seller_id: listing.seller_id,
-      amount: listing.price,
-      platform_fee: listing.price * (PLATFORM_FEE_PERCENT / 100),
+      amount: selectedPrice,
+      platform_fee: selectedPrice * (PLATFORM_FEE_PERCENT / 100),
       requirements: requirements || "",
       stripe_payment_id: session.id,
       status: "pending",

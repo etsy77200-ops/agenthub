@@ -12,7 +12,7 @@ import { useEffect } from "react";
 
 /** Never includes agent_access_url — buyers get that only via /api after payment. */
 const LISTING_PUBLIC_SELECT =
-  "id, title, short_description, description, price, price_type, tags, rating, review_count, order_count, demo_url, status, created_at, seller:profiles!listings_seller_id_fkey(id, name, bio, created_at), category:categories(name, slug)";
+  "id, title, short_description, description, price, monthly_price, billing_type, price_type, tags, rating, review_count, order_count, demo_url, status, created_at, seller:profiles!listings_seller_id_fkey(id, name, bio, created_at), category:categories(name, slug)";
 
 type PayoutTrustState =
   | { kind: "idle" }
@@ -26,6 +26,8 @@ interface ListingData {
   short_description: string;
   description: string;
   price: number;
+  monthly_price?: number | null;
+  billing_type?: "one_time" | "monthly" | "both";
   price_type: string;
   tags: string[];
   rating: number;
@@ -57,6 +59,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
   const [ordering, setOrdering] = useState(false);
   const [contactingSeller, setContactingSeller] = useState(false);
   const [requirements, setRequirements] = useState("");
+  const [purchaseType, setPurchaseType] = useState<"one_time" | "monthly">("one_time");
   const [showOrderForm, setShowOrderForm] = useState(false);
   type BuyerAccessState =
     | { kind: "idle" }
@@ -78,6 +81,8 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
 
       if (data) {
         const row = data as unknown as ListingData;
+        const billing = row.billing_type ?? "one_time";
+        setPurchaseType(billing === "monthly" ? "monthly" : "one_time");
         setListing(row);
         setPayoutTrust({ kind: "loading" });
         try {
@@ -99,11 +104,13 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         // Fallback to mock data for demo
         const mock = MOCK_LISTINGS.find((l) => l.id === id);
         if (mock) {
-          setListing({
+          const mockRow = {
             ...mock,
             seller: mock.seller ? { ...mock.seller, id: mock.seller.id } : null,
             category: null,
-          } as unknown as ListingData);
+          } as unknown as ListingData;
+          setPurchaseType((mockRow.billing_type ?? "one_time") === "monthly" ? "monthly" : "one_time");
+          setListing(mockRow);
         }
         setPayoutTrust({ kind: "hidden" });
       }
@@ -170,6 +177,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         body: JSON.stringify({
           listing_id: listing!.id,
           requirements,
+          purchase_type: purchaseType,
         }),
       });
 
@@ -235,6 +243,14 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
   }
 
   const checkoutBlockedByPayout = payoutTrust.kind === "ok" && !payoutTrust.payout_ready;
+  const billingType = listing.billing_type ?? "one_time";
+  const selectedPrice =
+    purchaseType === "monthly"
+      ? Number(listing.monthly_price ?? 0)
+      : Number(listing.price ?? 0);
+  const checkoutBlockedByMissingPlanPrice =
+    purchaseType === "monthly" ? selectedPrice <= 0 : selectedPrice <= 0;
+  const checkoutBlocked = !listing.demo_url || listing.status !== "active" || checkoutBlockedByPayout || checkoutBlockedByMissingPlanPrice;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -413,27 +429,70 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
         {/* Sidebar - Order Card */}
         <div className="lg:col-span-1">
           <div className="border border-border rounded-xl p-6 sticky top-24">
-            <div className="text-3xl font-bold mb-1">${listing.price}</div>
-            <p className="text-sm text-muted mb-6">One-time payment</p>
+            <div className="text-3xl font-bold mb-1">
+              ${selectedPrice || 0}
+              <span className="text-base font-medium text-muted ml-1">
+                {purchaseType === "monthly" ? "/ month" : "one-time"}
+              </span>
+            </div>
+            <p className="text-sm text-muted mb-6">
+              {billingType === "both"
+                ? "Choose one-time or monthly billing"
+                : purchaseType === "monthly"
+                  ? "Recurring monthly subscription"
+                  : "One-time payment"}
+            </p>
+
+            {billingType === "both" && (
+              <div className="mb-4 p-3 rounded-lg border border-border bg-secondary/50">
+                <p className="text-xs font-medium text-foreground mb-2">Choose purchase option</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseType("one_time")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium border ${
+                      purchaseType === "one_time"
+                        ? "border-primary bg-primary text-white"
+                        : "border-border bg-white text-foreground"
+                    }`}
+                  >
+                    One-time (${Number(listing.price || 0)})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseType("monthly")}
+                    className={`px-3 py-2 rounded-md text-sm font-medium border ${
+                      purchaseType === "monthly"
+                        ? "border-primary bg-primary text-white"
+                        : "border-border bg-white text-foreground"
+                    }`}
+                  >
+                    Monthly (${Number(listing.monthly_price || 0)})
+                  </button>
+                </div>
+              </div>
+            )}
 
             {!showOrderForm ? (
               <>
                 <button
                   type="button"
                   onClick={() => setShowOrderForm(true)}
-                  disabled={
-                    !listing.demo_url || listing.status !== "active" || checkoutBlockedByPayout
-                  }
+                  disabled={checkoutBlocked}
                   className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Order Now
                 </button>
-                {(!listing.demo_url || listing.status !== "active" || checkoutBlockedByPayout) && (
+                {checkoutBlocked && (
                   <p className="text-xs text-muted mb-3 text-center">
                     {listing.status !== "active"
                       ? "This listing is not available for purchase."
                       : checkoutBlockedByPayout
                         ? "Checkout is unavailable until the seller finishes Stripe payout setup."
+                        : checkoutBlockedByMissingPlanPrice
+                          ? purchaseType === "monthly"
+                            ? "Monthly pricing is not available for this listing."
+                            : "One-time pricing is not available for this listing."
                         : !listing.demo_url
                           ? "A demo is required before purchase."
                           : "This listing is not available for purchase."}
@@ -462,10 +521,14 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                 </div>
                 <button
                   onClick={handleOrder}
-                  disabled={ordering || checkoutBlockedByPayout}
+                  disabled={ordering || checkoutBlockedByPayout || checkoutBlockedByMissingPlanPrice}
                   className="w-full py-3 bg-primary text-white rounded-lg font-medium hover:bg-primary-dark transition-colors disabled:opacity-50"
                 >
-                  {ordering ? "Redirecting to payment..." : `Pay $${listing.price}`}
+                  {ordering
+                    ? "Redirecting to payment..."
+                    : purchaseType === "monthly"
+                      ? `Subscribe $${selectedPrice}/month`
+                      : `Pay $${selectedPrice}`}
                 </button>
                 <button
                   onClick={() => setShowOrderForm(false)}
