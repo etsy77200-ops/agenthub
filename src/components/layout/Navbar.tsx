@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { getStoredAccessToken } from "@/lib/supabase-rest";
 
 export default function Navbar() {
@@ -11,6 +11,7 @@ export default function Navbar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   const handleSignOut = async () => {
     await signOut();
@@ -56,6 +57,14 @@ export default function Navbar() {
   const unreadLabel =
     unreadCount > 99 ? "99+" : unreadCount > 0 ? String(unreadCount) : "";
 
+  const navLinkBase =
+    "relative px-4 py-2 text-sm rounded-lg text-muted transition-all duration-200 hover:text-foreground hover:-translate-y-0.5 hover:bg-primary/5";
+  const navLinkActive = "text-primary bg-primary/10 shadow-sm shadow-primary/10";
+  const navUnderline =
+    "after:absolute after:left-3 after:right-3 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary after:scale-x-0 after:origin-left after:transition-transform after:duration-300 hover:after:scale-x-100";
+  const isActive = (href: string) =>
+    href === "/" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+
   return (
     <nav className="border-b border-border bg-white sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -83,23 +92,23 @@ export default function Navbar() {
               <>
                 <Link
                   href="/dashboard"
-                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                  className={`${navLinkBase} ${navUnderline} ${isActive("/dashboard") ? navLinkActive : ""}`}
                 >
                   Dashboard
                 </Link>
                 <Link
                   href="/dashboard/purchases"
-                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                  className={`${navLinkBase} ${navUnderline} ${isActive("/dashboard/purchases") ? navLinkActive : ""}`}
                 >
                   My purchases
                 </Link>
                 <Link
                   href="/dashboard/messages"
-                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors inline-flex items-center gap-2"
+                  className={`${navLinkBase} ${navUnderline} inline-flex items-center gap-2 ${isActive("/dashboard/messages") ? navLinkActive : ""}`}
                 >
                   <span>Messages</span>
                   {unreadCount > 0 && (
-                    <span className="inline-flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none">
+                    <span className="inline-flex min-w-5 h-5 px-1.5 items-center justify-center rounded-full bg-red-600 text-white text-[11px] font-semibold leading-none animate-pulse-soft">
                       {unreadLabel}
                     </span>
                   )}
@@ -107,7 +116,7 @@ export default function Navbar() {
                 {showAdmin && (
                   <Link
                     href="/admin"
-                    className="px-4 py-2 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
+                    className={`${navLinkBase} ${navUnderline} font-medium ${isActive("/admin") ? navLinkActive : "text-primary hover:text-primary-dark"}`}
                   >
                     Admin
                   </Link>
@@ -120,7 +129,7 @@ export default function Navbar() {
                   </div>
                   <button
                     onClick={handleSignOut}
-                    className="px-3 py-1.5 text-sm text-muted hover:text-red-600 transition-colors"
+                    className="px-3 py-1.5 text-sm text-muted rounded-lg transition-all duration-200 hover:text-red-600 hover:bg-red-50 hover:-translate-y-0.5"
                   >
                     Sign out
                   </button>
@@ -130,13 +139,13 @@ export default function Navbar() {
               <>
                 <Link
                   href="/auth/login"
-                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                  className={`${navLinkBase} ${navUnderline} ${isActive("/auth/login") ? navLinkActive : ""}`}
                 >
                   Log in
                 </Link>
                 <Link
                   href="/auth/signup"
-                  className="px-4 py-2 text-sm bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+                  className="px-4 py-2 text-sm bg-primary text-white rounded-lg transition-all duration-200 hover:bg-primary-dark hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/25"
                 >
                   Sign up
                 </Link>
