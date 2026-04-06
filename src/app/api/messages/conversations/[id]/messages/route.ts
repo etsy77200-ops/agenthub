@@ -26,6 +26,42 @@ function first<T>(v: T | T[] | null | undefined): T | null {
   return v ?? null;
 }
 
+async function sendMessageEmailIfConfigured(args: {
+  toEmail: string;
+  toName: string;
+  fromName: string;
+  listingTitle: string;
+  message: string;
+  conversationId: string;
+}) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MESSAGE_FROM_EMAIL;
+  if (!apiKey || !from) return;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://agenthub-bice.vercel.app";
+  const threadUrl = `${appUrl}/dashboard/messages/${args.conversationId}`;
+  const body = {
+    from,
+    to: [args.toEmail],
+    subject: `New AgentHub message about "${args.listingTitle}"`,
+    html: `<p>Hi ${args.toName || "there"},</p>
+<p><strong>${args.fromName || "Someone"}</strong> sent you a new message on AgentHub:</p>
+<blockquote>${args.message.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</blockquote>
+<p><a href="${threadUrl}">Open conversation</a></p>`,
+  };
+  try {
+    await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    // Non-blocking notification
+  }
+}
+
 async function loadConversationForUser(
   conversationId: string,
   userId: string
@@ -98,6 +134,14 @@ export async function GET(
     const buyer = first(loaded.meta.buyer);
     const seller = first(loaded.meta.seller);
     const isBuyer = loaded.meta.buyer_id === got.user.id;
+    await loaded.svc
+      .from("conversations")
+      .update({
+        ...(isBuyer
+          ? { buyer_last_read_at: new Date().toISOString() }
+          : { seller_last_read_at: new Date().toISOString() }),
+      })
+      .eq("id", conversationId);
 
     return NextResponse.json({
       conversation: {
@@ -159,6 +203,26 @@ export async function POST(
     if (error || !created) {
       console.error("messages insert:", error);
       return NextResponse.json({ error: "Failed to send message" }, { status: 500 });
+    }
+
+    const isBuyer = loaded.meta.buyer_id === got.user.id;
+    const recipientId = isBuyer ? loaded.meta.seller_id : loaded.meta.buyer_id;
+    const senderId = got.user.id;
+    const listing = first(loaded.meta.listings);
+    const [recipientProfile, senderProfile] = await Promise.all([
+      loaded.svc.from("profiles").select("email,name").eq("id", recipientId).maybeSingle(),
+      loaded.svc.from("profiles").select("name").eq("id", senderId).maybeSingle(),
+    ]);
+    const recipientEmail = String(recipientProfile.data?.email ?? "").trim();
+    if (recipientEmail) {
+      await sendMessageEmailIfConfigured({
+        toEmail: recipientEmail,
+        toName: String(recipientProfile.data?.name ?? "").trim(),
+        fromName: String(senderProfile.data?.name ?? "").trim() || "AgentHub user",
+        listingTitle: listing?.title ?? "a listing",
+        message: text,
+        conversationId,
+      });
     }
 
     return NextResponse.json({ message: created });

@@ -48,6 +48,18 @@ interface ListingData {
   } | null;
 }
 
+type ListingReview = {
+  id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  verified_purchase?: boolean;
+  reviewer:
+    | { name?: string | null }
+    | { name?: string | null }[]
+    | null;
+};
+
 export default function ListingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const { user } = useAuth();
@@ -71,6 +83,11 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
     | { kind: "unlocked"; url: string }
     | { kind: "paid_missing_url" };
   const [buyerAccess, setBuyerAccess] = useState<BuyerAccessState>({ kind: "idle" });
+  const [reviews, setReviews] = useState<ListingReview[]>([]);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
 
   useEffect(() => {
     const fetchListing = async () => {
@@ -162,6 +179,23 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
     };
   }, [listing, user]);
 
+  useEffect(() => {
+    if (!listing) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/listings/${listing.id}/reviews`, { headers: { Accept: "application/json" } });
+        const j = (await r.json().catch(() => ({}))) as { reviews?: ListingReview[] };
+        if (!cancelled) setReviews(Array.isArray(j.reviews) ? j.reviews : []);
+      } catch {
+        if (!cancelled) setReviews([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listing]);
+
   const handleOrder = async () => {
     if (!user) {
       router.push("/auth/login");
@@ -223,6 +257,41 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
       alert("Could not open a conversation right now.");
     } finally {
       setContactingSeller(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!user || !listing) {
+      router.push("/auth/login");
+      return;
+    }
+    const comment = reviewText.trim();
+    if (!comment) return setReviewError("Please write a short review.");
+    setReviewSubmitting(true);
+    setReviewError("");
+    try {
+      const headers: HeadersInit = { "Content-Type": "application/json", Accept: "application/json" };
+      const t = getStoredAccessToken();
+      if (t) headers.Authorization = `Bearer ${t}`;
+      const r = await fetch(`/api/listings/${listing.id}/reviews`, {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ rating: reviewRating, comment }),
+      });
+      const j = (await r.json().catch(() => ({}))) as { error?: string };
+      if (!r.ok) {
+        setReviewError(j.error || "Could not submit review.");
+        return;
+      }
+      setReviewText("");
+      const rr = await fetch(`/api/listings/${listing.id}/reviews`, { headers: { Accept: "application/json" } });
+      const jj = (await rr.json().catch(() => ({}))) as { reviews?: ListingReview[] };
+      setReviews(Array.isArray(jj.reviews) ? jj.reviews : []);
+    } catch {
+      setReviewError("Could not submit review.");
+    } finally {
+      setReviewSubmitting(false);
     }
   };
 
@@ -405,20 +474,24 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           <div>
             <h2 className="text-xl font-semibold mb-4">Reviews</h2>
             <div className="space-y-4">
-              {[
-                { name: "David L.", rating: 5, comment: "Incredible agent! Set it up in minutes and it's handling 80% of our support tickets automatically.", date: "2 weeks ago" },
-                { name: "Rachel M.", rating: 5, comment: "Best investment we've made this year. The agent is smart, fast, and our customers can't tell it's AI.", date: "1 month ago" },
-                { name: "Tom K.", rating: 4, comment: "Great agent overall. Took a bit of fine-tuning but the developer was very responsive.", date: "1 month ago" },
-              ].map((review, i) => (
-                <div key={i} className="border border-border rounded-lg p-4">
+              {reviews.length === 0 && (
+                <div className="border border-border rounded-lg p-4 text-sm text-muted">
+                  No verified reviews yet.
+                </div>
+              )}
+              {reviews.map((review) => {
+                const reviewer = Array.isArray(review.reviewer) ? review.reviewer[0] : review.reviewer;
+                const name = reviewer?.name?.trim() || "Verified buyer";
+                return (
+                <div key={review.id} className="border border-border rounded-lg p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 bg-secondary rounded-full flex items-center justify-center">
-                        <span className="text-sm font-medium text-muted">{review.name.charAt(0)}</span>
+                        <span className="text-sm font-medium text-muted">{name.charAt(0)}</span>
                       </div>
-                      <span className="font-medium text-sm">{review.name}</span>
+                      <span className="font-medium text-sm">{name}</span>
                     </div>
-                    <span className="text-xs text-muted">{review.date}</span>
+                    <span className="text-xs text-muted">{new Date(review.created_at).toLocaleDateString()}</span>
                   </div>
                   <div className="flex items-center gap-0.5 mb-2">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -433,8 +506,49 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                     ))}
                   </div>
                   <p className="text-sm text-muted">{review.comment}</p>
+                  {review.verified_purchase && (
+                    <p className="text-xs text-green-700 mt-2">Verified purchase</p>
+                  )}
                 </div>
-              ))}
+              )})}
+            </div>
+            <div className="mt-4 border border-border rounded-lg p-4">
+              <h3 className="text-sm font-semibold mb-2">Leave a verified review</h3>
+              <p className="text-xs text-muted mb-3">
+                Only buyers with a completed order can post one review per listing.
+              </p>
+              {reviewError && (
+                <div className="mb-2 text-sm text-red-700">{reviewError}</div>
+              )}
+              <div className="flex items-center gap-2 mb-2">
+                <label className="text-sm">Rating</label>
+                <select
+                  value={reviewRating}
+                  onChange={(e) => setReviewRating(Number(e.target.value))}
+                  className="px-2 py-1 border border-border rounded-md text-sm"
+                >
+                  <option value={5}>5</option>
+                  <option value={4}>4</option>
+                  <option value={3}>3</option>
+                  <option value={2}>2</option>
+                  <option value={1}>1</option>
+                </select>
+              </div>
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 border border-border rounded-lg text-sm"
+                placeholder="Share your experience with this agent..."
+              />
+              <button
+                type="button"
+                onClick={handleSubmitReview}
+                disabled={reviewSubmitting}
+                className="mt-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium disabled:opacity-50"
+              >
+                {reviewSubmitting ? "Submitting..." : "Submit review"}
+              </button>
             </div>
           </div>
         </div>

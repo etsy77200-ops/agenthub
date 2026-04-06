@@ -201,9 +201,17 @@ export default function DashboardPage() {
                 {listings.map((listing) => (
                   <tr key={listing.id} className="hover:bg-card-hover">
                     <td className="px-4 py-3">
-                      <Link href={`/listing/${listing.id}`} className="font-medium text-sm hover:text-primary">
-                        {listing.title}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/listing/${listing.id}`} className="font-medium text-sm hover:text-primary">
+                          {listing.title}
+                        </Link>
+                        <Link
+                          href={`/dashboard/listings/${listing.id}/edit`}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Edit
+                        </Link>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-sm hidden sm:table-cell">${listing.price}</td>
                     <td className="px-4 py-3 text-sm hidden md:table-cell">{listing.order_count}</td>

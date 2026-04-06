@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
+import { getStoredAccessToken } from "@/lib/supabase-rest";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { user, profile, loading, signOut } = useAuth();
   const router = useRouter();
 
@@ -21,6 +23,35 @@ export default function Navbar() {
     Boolean(user) &&
     (profile?.is_admin === true ||
       Boolean(adminEmail && user?.email?.toLowerCase().trim() === adminEmail));
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadCount(0);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const headers: HeadersInit = { Accept: "application/json" };
+        const token = getStoredAccessToken();
+        if (token) headers.Authorization = `Bearer ${token}`;
+        const res = await fetch("/api/messages/unread-count", {
+          headers,
+          credentials: "include",
+        });
+        const data = (await res.json().catch(() => ({}))) as { unread?: number };
+        if (!cancelled) setUnreadCount(Number(data.unread ?? 0));
+      } catch {
+        if (!cancelled) setUnreadCount(0);
+      }
+    };
+    void load();
+    const t = window.setInterval(load, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [user?.id]);
 
   return (
     <nav className="border-b border-border bg-white sticky top-0 z-50">
@@ -63,7 +94,7 @@ export default function Navbar() {
                   href="/dashboard/messages"
                   className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
                 >
-                  Messages
+                  Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}
                 </Link>
                 {showAdmin && (
                   <Link
@@ -136,7 +167,7 @@ export default function Navbar() {
                   My purchases
                 </Link>
                 <Link href="/dashboard/messages" className="block px-3 py-2 text-muted hover:text-foreground">
-                  Messages
+                  Messages{unreadCount > 0 ? ` (${unreadCount})` : ""}
                 </Link>
                 {showAdmin && (
                   <Link href="/admin" className="block px-3 py-2 text-primary font-medium">
