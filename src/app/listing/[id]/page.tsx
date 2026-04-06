@@ -55,6 +55,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
   const [loading, setLoading] = useState(true);
   const [payoutTrust, setPayoutTrust] = useState<PayoutTrustState>({ kind: "idle" });
   const [ordering, setOrdering] = useState(false);
+  const [contactingSeller, setContactingSeller] = useState(false);
   const [requirements, setRequirements] = useState("");
   const [showOrderForm, setShowOrderForm] = useState(false);
   type BuyerAccessState =
@@ -182,6 +183,35 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
     } catch {
       alert("Something went wrong. Please try again.");
       setOrdering(false);
+    }
+  };
+
+  const handleContactSeller = async () => {
+    if (!user) {
+      router.push("/auth/login");
+      return;
+    }
+    setContactingSeller(true);
+    try {
+      const headers: HeadersInit = { "Content-Type": "application/json", Accept: "application/json" };
+      const t = getStoredAccessToken();
+      if (t) headers.Authorization = `Bearer ${t}`;
+      const res = await fetch("/api/messages/conversations", {
+        method: "POST",
+        headers,
+        credentials: "include",
+        body: JSON.stringify({ listing_id: listing!.id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (!res.ok || !data.id) {
+        alert(data.error || "Could not open a conversation right now.");
+        return;
+      }
+      router.push(`/dashboard/messages/${data.id}`);
+    } catch {
+      alert("Could not open a conversation right now.");
+    } finally {
+      setContactingSeller(false);
     }
   };
 
@@ -409,8 +439,13 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                           : "This listing is not available for purchase."}
                   </p>
                 )}
-                <button className="w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-gray-200 transition-colors">
-                  Contact Seller
+                <button
+                  type="button"
+                  onClick={handleContactSeller}
+                  disabled={contactingSeller}
+                  className="block w-full py-3 bg-secondary text-foreground rounded-lg font-medium hover:bg-gray-200 transition-colors text-center disabled:opacity-50"
+                >
+                  {contactingSeller ? "Opening..." : "Contact Seller"}
                 </button>
               </>
             ) : (

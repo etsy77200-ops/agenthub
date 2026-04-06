@@ -59,6 +59,12 @@ export default function Navbar() {
                 >
                   My purchases
                 </Link>
+                <Link
+                  href="/dashboard/messages"
+                  className="px-4 py-2 text-sm text-muted hover:text-foreground transition-colors"
+                >
+                  Messages
+                </Link>
                 {showAdmin && (
                   <Link
                     href="/admin"
@@ -128,6 +134,9 @@ export default function Navbar() {
                 </Link>
                 <Link href="/dashboard/purchases" className="block px-3 py-2 text-muted hover:text-foreground">
                   My purchases
+                </Link>
+                <Link href="/dashboard/messages" className="block px-3 py-2 text-muted hover:text-foreground">
+                  Messages
                 </Link>
                 {showAdmin && (
                   <Link href="/admin" className="block px-3 py-2 text-primary font-medium">
