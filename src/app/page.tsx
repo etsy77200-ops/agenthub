@@ -269,6 +269,10 @@ export default function Home() {
         <div className="ambient-orb ambient-orb-a" />
         <div className="ambient-orb ambient-orb-b" />
         <div className="ambient-orb ambient-orb-c" />
+        <div className="ambient-ring ambient-ring-a" />
+        <div className="ambient-ring ambient-ring-b" />
+        <div className="ambient-beam ambient-beam-a" />
+        <div className="ambient-beam ambient-beam-b" />
         <div className="ambient-grid" />
       </div>
       {/* Hero */}
@@ -279,10 +283,14 @@ export default function Home() {
           <div className="hero-float-card hero-float-1">Auto billing</div>
           <div className="hero-float-card hero-float-2">Live messaging</div>
           <div className="hero-float-card hero-float-3">Verified reviews</div>
+          <div className="hero-float-card hero-float-4">Payout ready</div>
+          <div className="hero-float-card hero-float-5">Subscription safe</div>
           <div className="hero-particle hero-particle-1" />
           <div className="hero-particle hero-particle-2" />
           <div className="hero-particle hero-particle-3" />
           <div className="hero-particle hero-particle-4" />
+          <div className="hero-particle hero-particle-5" />
+          <div className="hero-particle hero-particle-6" />
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative">
           <Reveal delayMs={20}>
