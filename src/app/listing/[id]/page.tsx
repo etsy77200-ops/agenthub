@@ -67,6 +67,7 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
     | { kind: "guest" }
     | { kind: "none" }
     | { kind: "pending_payment" }
+    | { kind: "subscription_inactive" }
     | { kind: "unlocked"; url: string }
     | { kind: "paid_missing_url" };
   const [buyerAccess, setBuyerAccess] = useState<BuyerAccessState>({ kind: "idle" });
@@ -145,6 +146,8 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           setBuyerAccess({ kind: "unlocked", url: data.agent_access_url });
         } else if (data.reason === "pending_payment") {
           setBuyerAccess({ kind: "pending_payment" });
+        } else if (data.reason === "subscription_inactive") {
+          setBuyerAccess({ kind: "subscription_inactive" });
         } else if (data.reason === "missing_url") {
           setBuyerAccess({ kind: "paid_missing_url" });
         } else {
@@ -299,6 +302,16 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
                 My purchases
               </Link>{" "}
               in a moment.
+            </div>
+          )}
+
+          {user && buyerAccess.kind === "subscription_inactive" && (
+            <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              Your monthly subscription is not active, so access is paused. Check{" "}
+              <Link href="/dashboard/purchases" className="underline font-medium">
+                My purchases
+              </Link>{" "}
+              for status details.
             </div>
           )}
 

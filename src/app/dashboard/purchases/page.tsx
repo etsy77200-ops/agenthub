@@ -11,11 +11,14 @@ type PurchaseRow = {
   listing_id: string;
   listing_title: string;
   status: string;
+  purchase_type: "one_time" | "monthly";
+  stripe_subscription_status: string | null;
   created_at: string;
   amount: number;
   agent_access_url: string | null;
   access_pending: boolean;
   payment_pending: boolean;
+  subscription_inactive: boolean;
 };
 
 function PurchasesContent() {
@@ -138,8 +141,19 @@ function PurchasesContent() {
                     {p.listing_title}
                   </Link>
                   <p className="text-sm text-muted mt-1">
-                    ${p.amount} · {new Date(p.created_at).toLocaleString()} ·{" "}
+                    ${p.amount}
+                    {p.purchase_type === "monthly" ? " / month" : ""}
+                    {" · "}
+                    {new Date(p.created_at).toLocaleString()} ·{" "}
                     <span className="capitalize">{p.status.replace("_", " ")}</span>
+                    {p.purchase_type === "monthly" && p.stripe_subscription_status && (
+                      <>
+                        {" · "}
+                        <span className="capitalize">
+                          sub: {p.stripe_subscription_status.replace("_", " ")}
+                        </span>
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -169,6 +183,11 @@ function PurchasesContent() {
                       support
                     </Link>
                     .
+                  </p>
+                )}
+                {!p.payment_pending && p.subscription_inactive && (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                    This monthly subscription is not active right now. Update payment details or renew to keep access.
                   </p>
                 )}
               </div>

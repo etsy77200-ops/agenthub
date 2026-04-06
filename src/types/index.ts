@@ -49,6 +49,12 @@ export interface Order {
   listing?: Listing;
   seller_id: string;
   seller?: User;
+  purchase_type?: "one_time" | "monthly";
+  stripe_subscription_id?: string;
+  stripe_subscription_status?: string;
+  stripe_last_invoice_id?: string;
+  subscription_current_period_end?: string;
+  subscription_cancelled_at?: string;
   status: "pending" | "accepted" | "in_progress" | "completed" | "cancelled";
   amount: number;
   platform_fee: number;

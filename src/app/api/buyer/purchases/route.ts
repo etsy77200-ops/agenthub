@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase-admin";
 import { getSupabaseUserFromRequest } from "@/lib/supabase-route-user";
 
 const PAID_STATUSES = new Set(["accepted", "in_progress", "completed"]);
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
 
 export async function GET(req: NextRequest) {
   try {
@@ -26,6 +27,8 @@ export async function GET(req: NextRequest) {
         id,
         listing_id,
         status,
+        purchase_type,
+        stripe_subscription_status,
         created_at,
         amount,
         listings (
@@ -46,6 +49,8 @@ export async function GET(req: NextRequest) {
       id: string;
       listing_id: string;
       status: string;
+      purchase_type?: string | null;
+      stripe_subscription_status?: string | null;
       created_at: string;
       amount: number;
       listings:
@@ -60,17 +65,24 @@ export async function GET(req: NextRequest) {
       const listing = Array.isArray(L) ? L[0] : L;
       const title = listing?.title ?? "Listing";
       const accessRaw = String(listing?.agent_access_url ?? "").trim();
+      const purchaseType = String(r.purchase_type ?? "one_time");
+      const subStatus = String(r.stripe_subscription_status ?? "").trim();
       const paid = PAID_STATUSES.has(r.status);
+      const subscriptionActive =
+        purchaseType !== "monthly" || ACTIVE_SUBSCRIPTION_STATUSES.has(subStatus);
       return {
         order_id: r.id,
         listing_id: r.listing_id,
         listing_title: title,
         status: r.status,
+        purchase_type: purchaseType,
+        stripe_subscription_status: subStatus || null,
         created_at: r.created_at,
         amount: r.amount,
-        agent_access_url: paid && accessRaw ? accessRaw : null,
-        access_pending: paid && !accessRaw,
+        agent_access_url: paid && subscriptionActive && accessRaw ? accessRaw : null,
+        access_pending: paid && subscriptionActive && !accessRaw,
         payment_pending: r.status === "pending",
+        subscription_inactive: purchaseType === "monthly" && !subscriptionActive,
       };
     });
 

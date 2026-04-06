@@ -3,6 +3,7 @@ import { createServiceSupabaseClient } from "@/lib/supabase-admin";
 import { getSupabaseUserFromRequest } from "@/lib/supabase-route-user";
 
 const PAID_STATUSES = new Set(["accepted", "in_progress", "completed"]);
+const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due"]);
 
 /**
  * Returns whether the current user has paid for this listing and may open the agent access URL.
@@ -29,7 +30,7 @@ export async function GET(
 
     const { data: order, error: orderErr } = await svc
       .from("orders")
-      .select("id, status")
+      .select("id, status, purchase_type, stripe_subscription_status")
       .eq("buyer_id", got.user.id)
       .eq("listing_id", listingId)
       .in("status", ["pending", "accepted", "in_progress", "completed", "cancelled"])
@@ -51,6 +52,19 @@ export async function GET(
         unlocked: false,
         reason: "pending_payment",
         status: order.status,
+      });
+    }
+
+    const purchaseType = String((order as { purchase_type?: string | null }).purchase_type ?? "one_time");
+    const subscriptionStatus = String(
+      (order as { stripe_subscription_status?: string | null }).stripe_subscription_status ?? ""
+    ).trim();
+    if (purchaseType === "monthly" && !ACTIVE_SUBSCRIPTION_STATUSES.has(subscriptionStatus)) {
+      return NextResponse.json({
+        unlocked: false,
+        reason: "subscription_inactive",
+        status: order.status,
+        subscription_status: subscriptionStatus || "unknown",
       });
     }
 

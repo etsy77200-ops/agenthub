@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
       buyer_id: user.id,
       listing_id: listing.id,
       seller_id: listing.seller_id,
+      purchase_type: requestedPurchaseType,
       amount: selectedPrice,
       platform_fee: selectedPrice * (PLATFORM_FEE_PERCENT / 100),
       requirements: requirements || "",
