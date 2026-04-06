@@ -83,13 +83,13 @@ export default function BrowseContent() {
             placeholder="Search agents..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="w-full px-4 py-2.5 border border-border rounded-xl bg-white/90 backdrop-blur-sm transition-all duration-200 hover:border-primary/35 hover:shadow-md hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:-translate-y-0.5"
           />
         </div>
         <select
           value={selectedCategory || ""}
           onChange={(e) => setSelectedCategory(e.target.value || null)}
-          className="px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+          className="px-4 py-2.5 border border-border rounded-xl bg-white/90 backdrop-blur-sm transition-all duration-200 hover:border-primary/35 hover:shadow-md hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:-translate-y-0.5"
         >
           <option value="">All Categories</option>
           {CATEGORIES.map((cat) => (
@@ -101,7 +101,7 @@ export default function BrowseContent() {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-          className="px-4 py-2.5 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 bg-white"
+          className="px-4 py-2.5 border border-border rounded-xl bg-white/90 backdrop-blur-sm transition-all duration-200 hover:border-primary/35 hover:shadow-md hover:shadow-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary focus:-translate-y-0.5"
         >
           <option value="popular">Most Popular</option>
           <option value="rating">Highest Rated</option>
@@ -114,10 +114,10 @@ export default function BrowseContent() {
         <button
           type="button"
           onClick={() => setSelectedCategory(null)}
-          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+          className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 ${
             !selectedCategory
-              ? "bg-primary text-white"
-              : "bg-secondary text-muted hover:text-foreground"
+              ? "bg-primary text-white shadow-md shadow-primary/30"
+              : "bg-secondary text-muted hover:text-foreground hover:bg-primary/10"
           }`}
         >
           All
@@ -127,10 +127,10 @@ export default function BrowseContent() {
             key={cat.id}
             type="button"
             onClick={() => setSelectedCategory(cat.slug === selectedCategory ? null : cat.slug)}
-            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 hover:-translate-y-0.5 ${
               selectedCategory === cat.slug
-                ? "bg-primary text-white"
-                : "bg-secondary text-muted hover:text-foreground"
+                ? "bg-primary text-white shadow-md shadow-primary/30"
+                : "bg-secondary text-muted hover:text-foreground hover:bg-primary/10"
             }`}
           >
             {cat.name}
@@ -143,7 +143,9 @@ export default function BrowseContent() {
           <p className="text-sm text-muted mb-4">{filtered.length} agents found</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filtered.map((listing) => (
-              <ListingCard key={listing.id} listing={listing} />
+              <div key={listing.id} className="transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10 rounded-2xl">
+                <ListingCard listing={listing} />
+              </div>
             ))}
           </div>
         </>
