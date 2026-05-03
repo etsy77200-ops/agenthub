@@ -2,7 +2,6 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { MOCK_LISTINGS } from "@/lib/constants";
 import { useAuth } from "@/components/AuthProvider";
 import { SellerPayoutTrust } from "@/components/SellerPayoutTrust";
 import { createClient } from "@/lib/supabase";
@@ -119,17 +118,6 @@ export default function ListingPage({ params }: { params: Promise<{ id: string }
           setPayoutTrust({ kind: "hidden" });
         }
       } else {
-        // Fallback to mock data for demo
-        const mock = MOCK_LISTINGS.find((l) => l.id === id);
-        if (mock) {
-          const mockRow = {
-            ...mock,
-            seller: mock.seller ? { ...mock.seller, id: mock.seller.id } : null,
-            category: null,
-          } as unknown as ListingData;
-          setPurchaseType((mockRow.billing_type ?? "one_time") === "monthly" ? "monthly" : "one_time");
-          setListing(mockRow);
-        }
         setPayoutTrust({ kind: "hidden" });
       }
       setLoading(false);

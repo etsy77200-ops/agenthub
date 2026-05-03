@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_LISTINGS } from "@/lib/constants";
 
-const allOrders = [
-  { id: "o1", listing: MOCK_LISTINGS[0].title, buyer: "John Davidson", amount: 499, status: "in_progress", date: "2026-03-28", requirements: "Need multilingual support for English, Spanish, and French. Integrate with our Zendesk account." },
-  { id: "o2", listing: MOCK_LISTINGS[2].title, buyer: "Anna Schmidt", amount: 599, status: "completed", date: "2026-03-25", requirements: "Connect to our PostgreSQL database and generate weekly revenue reports." },
-  { id: "o3", listing: MOCK_LISTINGS[4].title, buyer: "Chris Park", amount: 399, status: "pending", date: "2026-04-01", requirements: "Set up for our GitHub org. Focus on Python and TypeScript repos." },
-  { id: "o4", listing: MOCK_LISTINGS[1].title, buyer: "Maria Lopez", amount: 799, status: "accepted", date: "2026-03-30", requirements: "B2B SaaS targeting companies with 50-200 employees in the fintech space." },
-  { id: "o5", listing: MOCK_LISTINGS[3].title, buyer: "David Kim", amount: 299, status: "completed", date: "2026-03-20", requirements: "10 SEO blog posts per month on cloud computing topics." },
-];
+const allOrders: Array<{
+  id: string;
+  listing: string;
+  buyer: string;
+  amount: number;
+  status: string;
+  date: string;
+  requirements: string;
+}> = [];
 
 const statusColors: Record<string, string> = {
   pending: "bg-yellow-100 text-yellow-800",

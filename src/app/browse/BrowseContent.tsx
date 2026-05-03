@@ -3,9 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import ListingCard from "@/components/listings/ListingCard";
-import { CATEGORIES, MOCK_LISTINGS } from "@/lib/constants";
+import { CATEGORIES } from "@/lib/constants";
 import { CATEGORY_INTROS } from "@/lib/category-intros";
 import type { Listing } from "@/types";
+import { createClient } from "@/lib/supabase";
 
 function categorySlugFromUrl(raw: string | null): string | null {
   if (!raw) return null;
@@ -13,7 +14,10 @@ function categorySlugFromUrl(raw: string | null): string | null {
 }
 
 export default function BrowseContent() {
+  const supabase = createClient();
   const searchParams = useSearchParams();
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loadingListings, setLoadingListings] = useState(true);
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(() =>
     categorySlugFromUrl(searchParams.get("category"))
@@ -25,7 +29,28 @@ export default function BrowseContent() {
     setSelectedCategory(next);
   }, [searchParams]);
 
-  const listings = MOCK_LISTINGS as unknown as Listing[];
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("listings")
+          .select(
+            "id,seller_id,title,description,short_description,category_id,price,monthly_price,billing_type,price_type,tags,images,demo_url,status,rating,review_count,order_count,created_at"
+          )
+          .eq("status", "active")
+          .order("created_at", { ascending: false });
+        if (!cancelled) setListings((data ?? []) as Listing[]);
+      } catch {
+        if (!cancelled) setListings([]);
+      } finally {
+        if (!cancelled) setLoadingListings(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   const filtered = useMemo(() => {
     let results = [...listings];
@@ -162,7 +187,9 @@ export default function BrowseContent() {
             </svg>
           </div>
           <h3 className="text-lg font-semibold mb-2">No agents found</h3>
-          <p className="text-muted">Try adjusting your search or filter criteria</p>
+          <p className="text-muted">
+            {loadingListings ? "Loading agents..." : "Try adjusting your search or filter criteria"}
+          </p>
         </div>
       )}
     </div>

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import ListingCard from "@/components/listings/ListingCard";
-import { CATEGORIES, MOCK_LISTINGS } from "@/lib/constants";
+import { CATEGORIES } from "@/lib/constants";
 import type { Listing } from "@/types";
+import { createClient } from "@/lib/supabase";
 
 function Reveal({
   children,
@@ -102,7 +103,9 @@ function CountUp({
 }
 
 export default function Home() {
-  const featuredListings = MOCK_LISTINGS as unknown as Listing[];
+  const supabase = createClient();
+  const [featuredListings, setFeaturedListings] = useState<Listing[]>([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [flow, setFlow] = useState<"buyers" | "sellers">("buyers");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -237,6 +240,30 @@ export default function Home() {
       role: "Growth Engineer, Buildwise AI",
     },
   ];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("listings")
+          .select(
+            "id,seller_id,title,description,short_description,category_id,price,monthly_price,billing_type,price_type,tags,images,demo_url,status,rating,review_count,order_count,created_at"
+          )
+          .eq("status", "active")
+          .order("order_count", { ascending: false })
+          .limit(6);
+        if (!cancelled) setFeaturedListings((data ?? []) as Listing[]);
+      } catch {
+        if (!cancelled) setFeaturedListings([]);
+      } finally {
+        if (!cancelled) setFeaturedLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [supabase]);
 
   useEffect(() => {
     const elements = sectionNav
@@ -516,6 +543,7 @@ export default function Home() {
               );
             })}
           </div>
+          {featuredLoading && <div className="mt-6 text-sm text-muted">Loading featured agents...</div>}
           {filteredListings.length === 0 && (
             <div className="mt-6 rounded-xl border border-dashed border-border p-6 text-center text-muted">
               No featured agents in this category yet.
